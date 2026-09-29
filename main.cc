@@ -1,6 +1,8 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <string>
+#include <unordered_map>
 
 #define TODO (exit(1))
 
@@ -29,10 +31,33 @@ enum TokenType {
   IDENTIFIER, STRING, NUMBER,
 
   AND, CLASS, ELSE, FALSE, FUN, FOR, IF, NIL, OR,
-  PRINT, RETURN, SUPER, THIS, TRUE, VAR, WHILE,
+  PRINT, RETURN, SUPER, THIS, TRUE, VAR, INTID, WHILE,
 
   END_OF_FILE
 };
+
+
+static std::unordered_map<std::string, TokenType> keywords;
+
+static void populate_keywords() {
+    keywords["and"] = AND;
+    keywords["class"] = CLASS;
+    keywords["else"] =  ELSE;
+    keywords["false"] = FALSE;
+    keywords["for"] =   FOR;
+    keywords["fun"] =   FUN;
+    keywords["if"] =    IF;
+    keywords["nil"] =   NIL;
+    keywords["or"] =    OR;
+    keywords["print"] = PRINT;
+    keywords["return"] =RETURN;
+    keywords["super"] = SUPER;
+    keywords["this"] =  THIS;
+    keywords["true"] =  TRUE;
+    keywords["var"] =   VAR;
+    keywords["int"] =   INTID;
+    keywords["while"] = WHILE;
+}
 
 
 enum StaticType {
@@ -44,7 +69,6 @@ struct Literal {
 
     StaticType type;
     union {
-
         i32 int_value;
         bool bool_value;
     } value;
@@ -52,6 +76,19 @@ struct Literal {
     explicit Literal() {
         type = INT;
         value.int_value = 0;
+    }
+
+    explicit Literal(StaticType t, void* v_ptr) {
+        if (t == INT) {
+            type = INT;
+            value.int_value =  * (int*) v_ptr;
+        }
+        if (t == BOOL) {
+            type = BOOL;
+            value.bool_value =  * (bool*) v_ptr;
+        }
+
+
     }
 };
 
@@ -87,8 +124,18 @@ static inline bool more(const Scanner& scanner) {
 }
 
 static inline Token new_token(Scanner& scanner, TokenType tt) {
-    return Token("", Literal(), scanner.line, tt);
+    std::string lexeme = scanner.source->substr(scanner.start, scanner.current - scanner.start);
+    std::cout << "returning token with lexeme: " << lexeme << std::endl;
+
+    //int literal, convert to int first
+    if (tt == NUMBER) {
+        int value = std::stoi(lexeme);
+        return Token(lexeme, Literal(StaticType::INT, &value), scanner.line, tt);
+    }
+
+    return Token(lexeme, Literal(), scanner.line, tt);
 }
+
 
 static inline bool match_forward(Scanner& scanner, char c) {
     if (!more(scanner)) return false;
@@ -98,11 +145,57 @@ static inline bool match_forward(Scanner& scanner, char c) {
     return true;
 }
 
+static inline char peek(Scanner& scanner) {
+    if (!more(scanner)) return '\0';
+    return (*scanner.source)[scanner.current];
+}
+
+static inline bool is_digit(char c) {
+    return c >= '0' && c <= '9';
+}
+
+static inline bool is_alpha(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+
+static inline bool is_alphanumeric(char c) {
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+}
+
+static inline char advance(Scanner& scanner) {
+    return (*scanner.source)[scanner.current++];
+}
+
+static inline Token compute_number_literal(Scanner& scanner) {
+    while (is_digit(peek(scanner))) advance(scanner);
+
+    Token t = new_token(scanner, NUMBER);
+    return t;
+}
+
+static inline Token compute_identifier(Scanner& scanner) {
+    while (is_alphanumeric(peek(scanner))) advance(scanner);
+
+    std::string text = (*scanner.source).substr(scanner.start, scanner.current - scanner.start);
+
+    TokenType tt = IDENTIFIER;
+    if (keywords.find(text) != keywords.end())
+        TokenType tt = keywords[text];
+
+    Token t = new_token(scanner, tt);
+    return t;
+}
+
 static inline Token scan_token(Scanner& scanner) {
     const std::string& source = *scanner.source;
     char c = source[scanner.current++];
+    std::cout << "token goes from: " << scanner.start << " to " << scanner.current << std::endl;
     Token t = DEFAULT_TOKEN;
     switch (c) {
+        case ' ': break;
+        case '\r': break;
+        case '\n': ++scanner.line; break;
+        case '\t': break;
         case '(': t = new_token(scanner, LEFT_PAREN); break;
         case ')': t = new_token(scanner, RIGHT_PAREN); break;
         case '{': t = new_token(scanner, LEFT_BRACE); break;
@@ -116,11 +209,40 @@ static inline Token scan_token(Scanner& scanner) {
         case '!':
             {
                 if (match_forward(scanner, '='))
-                    new_token(scanner, BANG_EQUAL);
-                else new_token(scanner, BANG);
+                    t = new_token(scanner, BANG_EQUAL);
+                else t = new_token(scanner, BANG);
                 break;
             }
-        default: break;
+        case '=':
+            {
+                if (match_forward(scanner, '='))
+                    t = new_token(scanner, EQUAL_EQUAL);
+                else t = new_token(scanner, EQUAL);
+                break;
+            }
+        case '<':
+            {
+                if (match_forward(scanner, '='))
+                    t = new_token(scanner, LESS_EQUAL);
+                else t = new_token(scanner, LESS);
+                break;
+            }
+        case '>':
+            {
+                if (match_forward(scanner, '='))
+                    t = new_token(scanner, GREATER_EQUAL);
+                else t = new_token(scanner, GREATER);
+                break;
+            }
+
+        default:
+            if (is_digit(c)) {
+                t = compute_number_literal(scanner);
+            }
+            else if (is_alpha(c)) {
+                t = compute_identifier(scanner);
+            }
+            break;
     }
     return t;
 }
@@ -154,7 +276,7 @@ int main() {
     std::vector<Token> tokens = scan_tokens(source);
 
     for (Token t : tokens) {
-        std::cout << t.type << std::endl;
+        std::cout << t.lexeme << std::endl;
     }
 
 
