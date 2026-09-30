@@ -1,6 +1,7 @@
 #pragma once
 
 #include "parser.hh"
+#include <iostream>
 
 
 enum CFGStmtKind {
