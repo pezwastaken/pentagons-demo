@@ -217,6 +217,7 @@ static inline Token scan_token(Scanner& scanner) {
         case '+': t = new_token(scanner, PLUS); break;
         case ';': t = new_token(scanner, SEMICOLON); break;
         case '*': t = new_token(scanner, STAR); break;
+        case '/': t = new_token(scanner, SLASH); break;
         case '!':
             {
                 if (match_forward(scanner, '='))

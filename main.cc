@@ -18,7 +18,7 @@ int main() {
         std::cout << std::endl;
     }
 
-    Parser p = Parser {tokens, 0U};
+    Parser p = Parser {tokens, {}, 0U};
     // Expr* root = parse_program(p);
     //
     // std::string res = dump_expr(*root);
@@ -27,8 +27,11 @@ int main() {
 
     std::vector<Stmt*> program = parse_program(p, {});
 
-    Stmt* first = program[0];
-    std::cout << dump_stmt(*first) << std::endl;
+    std::cout << "program has " << program.size() << " statements" << std::endl;
+
+    for (auto s : program) {
+        std::cout << dump_stmt(*s) << std::endl;
+    }
 
     return 0;
 
