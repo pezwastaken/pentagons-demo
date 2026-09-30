@@ -33,7 +33,6 @@ static inline bool more(const Scanner& scanner) {
 
 static inline Token new_token(Scanner& scanner, TokenType tt) {
     std::string lexeme = scanner.source->substr(scanner.start, scanner.current - scanner.start);
-    std::cout << "returning token with lexeme: " << lexeme << std::endl;
 
     //int literal, convert to int first
     if (tt == NUMBER) {
@@ -88,7 +87,6 @@ static inline Token compute_identifier(Scanner& scanner) {
 
     TokenType tt = IDENTIFIER;
     if (keywords.find(text) != keywords.end()) {
-        std::cout << "identifier is exactly a keyword: " << keywords[text] << std::endl;
         tt = keywords[text];
     }
 
@@ -99,7 +97,6 @@ static inline Token compute_identifier(Scanner& scanner) {
 static inline Token scan_token(Scanner& scanner) {
     const std::string& source = *scanner.source;
     char c = source[scanner.current++];
-    std::cout << "token goes from: " << scanner.start << " to " << scanner.current << std::endl;
     Token t = DEFAULT_TOKEN;
     switch (c) {
         case ' ': break;

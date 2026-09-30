@@ -1,5 +1,6 @@
 #pragma once
 
+#include "arena.hh"
 #include "lexer.hh"
 #include <cassert>
 #include <string>
@@ -33,6 +34,7 @@ struct Parser {
     const std::vector<Token>& tokens;
     std::vector<ParseError> errors;
     usize pos;
+    Arena* arena;
 };
 
 enum StmtKind {

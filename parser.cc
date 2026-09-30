@@ -58,41 +58,36 @@ static inline std::optional<Token> expect(Parser& p, TokenType t) {
     return std::nullopt;
 }
 
-static inline Expr* make_literal (Token t) {
-    Expr* e = new Expr;
+static inline Expr* make_literal (Parser& parser, Token t) {
+    Expr* e = arena_new<Expr>(parser.arena);
     e->kind = LITERAL_EXPR,
     e-> token = t;
     e->type = t.literal.type;
     e->left = nullptr;
     e->right = nullptr;
 
-    std::cout << "making literal" << std::endl;
     return e;
 }
 
-static inline Expr* make_variable (Token t) {
-    Expr* e = new Expr;
+static inline Expr* make_variable (Parser& parser, Token t) {
+    Expr* e = arena_new<Expr>(parser.arena);
     e->kind = VARIABLE_EXPR,
     e-> token = t;
     e->type = INT;
     e->left = nullptr;
     e->right = nullptr;
 
-    std::cout << "making variable" << std::endl;
     return e;
 }
 
-static inline Expr* make_binary (Token op, Expr* left, Expr* right) {
-    Expr* e = new Expr;
+static inline Expr* make_binary (Parser& parser, Token op, Expr* left, Expr* right) {
+    Expr* e = arena_new<Expr>(parser.arena);
     e->kind = BINARY_EXPR,
     e-> token = op;
     e->type = INT;
     e->left = left;
     e->right = right;
 
-    std::cout << "making binary" << std::endl;
-    if (left == nullptr) std::cout << "\tleft is null" << std::endl;
-    if (right == nullptr) std::cout << "\tright is null" << std::endl;
     return e;
 }
 
@@ -102,9 +97,9 @@ static inline Expr* parse_atom(Parser& parser) {
 
     case NUMBER:
     case FALSE:
-    case TRUE: return make_literal(advance(parser));
+    case TRUE: return make_literal(parser, advance(parser));
     case LEFT_PAREN: UNREACHABLE; // TODO
-    case IDENTIFIER: return make_variable(advance(parser));
+    case IDENTIFIER: return make_variable(parser, advance(parser));
     default:
         return nullptr;
     }
@@ -122,7 +117,6 @@ static inline Expr* parse_expr(Parser& parser, i32 min_prec = 1) {
 
     Expr* left = parse_unary(parser);
 
-    std::cout << "parsed unary (parse_expr)" << std::endl;
     if (left == nullptr) std::cout << "\tit's null" << std::endl;
 
     while (true) {
@@ -136,7 +130,7 @@ static inline Expr* parse_expr(Parser& parser, i32 min_prec = 1) {
         int next_min = info.right_assoc ? info.prec : info.prec + 1;
         Expr* right = parse_expr(parser, next_min);
 
-        left = make_binary(op, left, right);
+        left = make_binary(parser, op, left, right);
     }
 
     return left;
@@ -163,8 +157,6 @@ static inline Stmt* parse_statement(Parser& p);
 
 static inline Stmt* parse_var_decl(Parser& parser) {
 
-    std::cout << "parsing var decl" << std::endl;
-
     Token type = advance(parser);
     assert(type.type == INTID);
 
@@ -174,14 +166,15 @@ static inline Stmt* parse_var_decl(Parser& parser) {
         return nullptr;
 
     Token name = previous(parser);
-    std::cout << "var name is: " << name.lexeme << std::endl;
 
     Expr* init;
     if (match(parser, EQUAL)) init = parse_expr(parser);
 
     if (!match(parser, SEMICOLON)) return nullptr;
 
-    Stmt* s = new Stmt(DECL_STMT, type);
+    Stmt* s = arena_new<Stmt>(parser.arena);
+    s->kind = DECL_STMT;
+    s->token = type;
     s->as.decl.expr = init;
     s->as.decl.name = name;
 
@@ -190,13 +183,10 @@ static inline Stmt* parse_var_decl(Parser& parser) {
 
 static inline Stmt* parse_assignment_or_expr(Parser& parser) {
 
-    std::cout << "parsing assignment or expr" << std::endl;
-
     Expr* lhs = parse_expr(parser);
     Stmt* s = nullptr;
 
     if (match(parser, EQUAL)) {
-        std::cout << "has an equal" << std::endl;
         if (lhs->kind != VARIABLE_EXPR) {
             parser.errors.push_back({"assigning a value to an expression that is not an identifier"});
             return nullptr;
@@ -204,12 +194,16 @@ static inline Stmt* parse_assignment_or_expr(Parser& parser) {
 
         Expr* init = parse_expr(parser);
 
-        s = new Stmt(ASSIGN_STMT, lhs->token);
+        s = arena_new<Stmt>(parser.arena);
+        s->kind = ASSIGN_STMT;
+        s->token = lhs->token;
         s->as.assign.target = lhs;
         s->as.assign.expr = init;
     }
     else {
-        s = new Stmt(EXPR_STMT, lhs->token);
+        s = arena_new<Stmt>(parser.arena);
+        s->kind = EXPR_STMT;
+        s->token = lhs->token;
         s->as.expr.expr = lhs;
     }
 
@@ -220,7 +214,6 @@ static inline Stmt* parse_assignment_or_expr(Parser& parser) {
 
 static inline Stmt* parse_if(Parser& p) {
 
-    std::cout << "parsing if" << std::endl;
     Token kw = advance(p);
     assert(kw.type == IF);
     if (!match(p, LEFT_PAREN)) p.errors.push_back({"expected left paren after if"});
@@ -234,7 +227,9 @@ static inline Stmt* parse_if(Parser& p) {
 
     if (match(p, ELSE)) else_body = parse_statement(p);
 
-    Stmt* if_stmt = new Stmt(IF_STMT, kw);
+    Stmt* if_stmt = arena_new<Stmt>(p.arena);
+    if_stmt->kind = IF_STMT;
+    if_stmt->token = kw;
     if_stmt->as.if_stmt.guard = guard;
     if_stmt->as.if_stmt.then_branch = then_body;
     if_stmt->as.if_stmt.else_branch = else_body;
@@ -254,7 +249,9 @@ static inline Stmt* parse_while(Parser& p) {
 
     Stmt* then_body = parse_statement(p);
 
-    Stmt* while_stmt = new Stmt(WHILE_STMT, kw);
+    Stmt* while_stmt = arena_new<Stmt>(p.arena);
+    while_stmt->kind = WHILE_STMT;
+    while_stmt->token = kw;
     while_stmt->as.while_stmt.guard = guard;
     while_stmt->as.if_stmt.then_branch = then_body;
 
@@ -263,8 +260,6 @@ static inline Stmt* parse_while(Parser& p) {
 
 static inline Stmt* parse_block(Parser& p) {
 
-    std::cout << "parsing block" << std::endl;
-
     Token kw = advance(p);
     assert(kw.type == LEFT_BRACE);
 
@@ -272,22 +267,19 @@ static inline Stmt* parse_block(Parser& p) {
 
     while (!check_eq(p, RIGHT_BRACE) && more(p)) {
         res.push_back(parse_statement(p));
-        std::cout << "\tparsed a statement inside the block" << std::endl;
     }
 
     if (!match(p, RIGHT_BRACE)) p.errors.push_back({"expected right brace closing block"});
 
-    std::cout << "found a closing brace" << std::endl;
-
-    Stmt* block = new Stmt(BLOCK_STMT, kw);
+    Stmt* block = arena_new<Stmt>(p.arena);
+    block->kind = BLOCK_STMT;
+    block->token = kw;
     block->as.block.stmts = res;
 
     return block;
 }
 
 static inline Stmt* parse_statement(Parser& p) {
-
-    std::cout << "stmt type: " << peek(p).type << std::endl;
 
     switch (peek(p).type) {
         case INTID:
@@ -312,8 +304,8 @@ std::vector<Stmt*> parse_program(Parser& p, std::vector<ParseError> errors) {
         Stmt* s = parse_statement(p);
         res.push_back(s);
 
-        if (s)
-            std::cout << "pushed a non null statement" << std::endl;
+        if (!s)
+            std::cout << "pushed a null statement" << std::endl;
         std::cout << std::endl;
     }
 

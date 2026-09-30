@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include "arena.hh"
 #include "cfg.hh"
 
 
@@ -18,7 +19,8 @@ int main() {
         std::cout << std::endl;
     }
 
-    Parser p = Parser {tokens, {}, 0U};
+    Arena* mem_arena = arena_create(1000000);
+    Parser p = Parser {tokens, {}, 0U, mem_arena};
 
     std::vector<Stmt*> program = parse_program(p, {});
 
@@ -30,6 +32,8 @@ int main() {
 
     Node* cfg_root = get_cfg(program);
     debug_cfg(cfg_root);
+
+    arena_destroy(p.arena);
 
     return 0;
 
