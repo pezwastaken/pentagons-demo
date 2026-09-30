@@ -11,7 +11,6 @@ struct OpInfo {
 static inline OpInfo binary_op_info(TokenType t) {
 
     switch (t) {
-    case EQUAL: return OpInfo {1, false};
     case OR: return OpInfo {2, false};
     case AND: return OpInfo {3, false};
     case BANG_EQUAL:
@@ -181,4 +180,99 @@ inline std::string dump_expr(const Expr& expr) {
     }
 }
 
+enum StmtKind {
+    EXPR_STMT,
+    ASSIGN_STMT,
+    DECL_STMT,
+    IF_STMT,
+    WHILE_STMT,
+    BLOCK_STMT,
+};
+
+struct Stmt {
+
+    StmtKind kind;
+    Token token;
+
+
+    union StmtData {
+
+        struct { Expr* expr; } expr;
+        struct { Token name; Expr* expr; } decl;
+        struct { Expr* target; Expr* expr; } assign;
+
+        explicit StmtData() {
+            expr.expr = nullptr;
+        }
+
+        ~StmtData() { }
+    } as;
+
+    explicit Stmt(StmtKind k, Token t) : kind(k), token(t) {
+        // kind = k;
+        // token = t;
+    }
+
+};
+
+
+inline Stmt* parse_var_decl(Parser& parser) {
+
+    Token type = advance(parser);
+    bool is_identifier = match(parser, IDENTIFIER);
+    if (!is_identifier)
+        return nullptr;
+
+    Token name = previous(parser);
+
+    Expr* init;
+    if (match(parser, EQUAL)) init = parse_expr(parser);
+
+    if (!match(parser, SEMICOLON)) return nullptr;
+
+    Stmt* s = new Stmt(DECL_STMT, type);
+    s->as.decl.expr = init;
+    s->as.decl.name = name;
+
+    return s;
+}
+
+struct ParseError {
+
+};
+
+inline Stmt* parse_statement(Parser& p) {
+
+    std::cout << "stmt type: " << peek(p).type << std::endl;
+
+    switch (peek(p).type) {
+        case INTID:
+            return parse_var_decl(p);
+        default:
+            return nullptr;
+    }
+}
+
+inline std::vector<Stmt*> parse_program(Parser& p, std::vector<ParseError> errors) {
+
+    std::vector<Stmt*> res;
+
+    Stmt* s = parse_statement(p);
+
+    if (s == nullptr)
+        std:: cout << "first stmt is null" << std::endl;
+
+    res.push_back(s);
+    return res;
+}
+
+
+inline std::string dump_stmt(const Stmt& s) {
+    switch (s.kind) {
+    case DECL_STMT:
+        return s.token.lexeme + " " + s.as.decl.name.lexeme + " = " + (dump_expr(*s.as.decl.expr));
+    default:
+        UNREACHABLE;
+    }
+}
 

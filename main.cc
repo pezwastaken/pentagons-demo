@@ -19,11 +19,16 @@ int main() {
     }
 
     Parser p = Parser {tokens, 0U};
-    Expr* root = parse_expr(p);
+    // Expr* root = parse_program(p);
+    //
+    // std::string res = dump_expr(*root);
+    // std::cout << "parsed result: " << res << std::endl;
 
-    std::string res = dump_expr(*root);
-    std::cout << "parsed result: " << res << std::endl;
 
+    std::vector<Stmt*> program = parse_program(p, {});
+
+    Stmt* first = program[0];
+    std::cout << dump_stmt(*first) << std::endl;
 
     return 0;
 

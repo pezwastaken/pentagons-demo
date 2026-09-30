@@ -87,9 +87,9 @@ struct Literal {
             type = BOOL;
             value.bool_value =  * (bool*) v_ptr;
         }
-
-
     }
+
+    ~Literal() { }
 };
 
 
@@ -108,6 +108,8 @@ struct Token {
 
     Token(std::string lexeme, Literal literal, u32 line, TokenType type) :
         lexeme(lexeme), literal(literal), line(line), type(type) { }
+
+    ~Token() { }
 
 };
 
@@ -186,8 +188,10 @@ static inline Token compute_identifier(Scanner& scanner) {
     std::string text = (*scanner.source).substr(scanner.start, scanner.current - scanner.start);
 
     TokenType tt = IDENTIFIER;
-    if (keywords.find(text) != keywords.end())
-        TokenType tt = keywords[text];
+    if (keywords.find(text) != keywords.end()) {
+        std::cout << "identifier is exactly a keyword: " << keywords[text] << std::endl;
+        tt = keywords[text];
+    }
 
     Token t = new_token(scanner, tt);
     return t;
@@ -255,6 +259,8 @@ static inline Token scan_token(Scanner& scanner) {
 }
 
 inline std::vector<Token> scan_tokens(const std::string& source) {
+
+    populate_keywords();
 
     std::vector<Token> tokens;
     Scanner scanner = Scanner(source);

@@ -1,3 +1,3 @@
 
-xx = a + b * c;
+int xy = a + b + c;
 
