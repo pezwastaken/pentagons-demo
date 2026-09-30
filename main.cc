@@ -1,6 +1,6 @@
 #include <iostream>
 #include <string>
-#include "parser.hh"
+#include "cfg.hh"
 
 
 int main() {
@@ -32,6 +32,9 @@ int main() {
     for (auto s : program) {
         std::cout << dump_stmt(*s) << std::endl;
     }
+
+    Node* cfg_root = get_cfg(program);
+    debug_cfg(cfg_root);
 
     return 0;
 

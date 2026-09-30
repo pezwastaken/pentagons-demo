@@ -1,3 +1,5 @@
+#pragma once
+
 #include "lexer.hh"
 #include <cassert>
 #include <optional>
@@ -226,8 +228,7 @@ struct Stmt {
     } as;
 
     explicit Stmt(StmtKind k, Token t) : kind(k), token(t) {
-        // kind = k;
-        // token = t;
+
     }
 
 };
