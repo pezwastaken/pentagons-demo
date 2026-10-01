@@ -34,6 +34,7 @@ inline ConstructionResult make_decl_node(Stmt& s) {
 inline ConstructionResult make_expr_node(Stmt& s) {
     Node* node = new Node;
     node->stmt.kind = EXPR;
+    assert(s.as.expr.expr != nullptr);
     node->stmt.expr = s.as.expr.expr;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
@@ -53,8 +54,6 @@ inline ConstructionResult make_nop() {
 
 inline ConstructionResult make_block_node(Stmt& s) {
 
-    std::cout << "building cfg for block" << std::endl;
-
     assert(s.kind == BLOCK_STMT);
 
     Node* root = get_cfg(s.as.block.stmts);
@@ -71,12 +70,11 @@ inline ConstructionResult make_block_node(Stmt& s) {
 
 inline ConstructionResult make_if(Stmt& s) {
 
-    std::cout << "building cfg for if" << std::endl;
-
     assert(s.kind == IF_STMT);
 
     Node* node = new Node;
     node->stmt.kind = EXPR;
+    node->stmt.expr = s.as.if_stmt.guard;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
 
@@ -145,6 +143,7 @@ void debug_cfg(Node* root) {
 }
 
 static std::string label(const CFGStmt& s) {
+
     switch (s.kind) {
         case DECLARATION:
             return "decl " + std::string(s.name.lexeme) + (s.rhs ? " = " + dump_expr(*s.rhs) : std::string());
