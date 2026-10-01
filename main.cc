@@ -30,7 +30,7 @@ int main() {
         std::cout << dump_stmt(*s) << std::endl;
     }
 
-    Node* cfg_root = get_cfg(program);
+    CFG cfg_root = get_cfg(program);
 
     bool done = write_cfg_dot(cfg_root, "out.dot");
 

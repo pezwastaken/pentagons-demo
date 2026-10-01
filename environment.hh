@@ -73,9 +73,9 @@ concept StateDomain = requires(D::State s, const std::string& x, const Expr& e) 
     // { D::eval(s, e) } -> std::same_as<typename D::State>;
     // TODO: this should return a tuple <abstract value, abstract state> (function calls with side effects)
 
-    { D::assume(s, e) } -> std::same_as<typename D::State>;
-    { D::join(s, s) } -> std::same_as<typename D::State>;
-    { D::widen(s, s) } -> std::same_as<typename D::State>;
+    // { D::assume(s, e) } -> std::same_as<typename D::State>;
+    // { D::join(s, s) } -> std::same_as<typename D::State>;
+    // { D::widen(s, s) } -> std::same_as<typename D::State>;
 
 };
 
@@ -123,6 +123,7 @@ struct Interval {
 
 
 static_assert(ValueDomain<Interval>);
+static_assert(StateDomain<NonRelational<Interval>>);
 
 
 

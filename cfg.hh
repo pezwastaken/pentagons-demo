@@ -35,10 +35,16 @@ struct Node {
     Node* false_edge = nullptr;
 
     SyntheticPP pp;
+
+    // AnalysisData* data = nullptr;
 };
 
-Node* get_cfg(std::vector<Stmt*>& program);
+struct CFG {
+    const Node* root;
+};
 
-void debug_cfg(Node* root);
+CFG get_cfg(std::vector<Stmt*>& program);
 
-bool write_cfg_dot(const Node* entry, const char* path);
+void debug_cfg(CFG cfg);
+
+bool write_cfg_dot(CFG cfg, const char* path);

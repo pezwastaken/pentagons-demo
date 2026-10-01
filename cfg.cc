@@ -10,6 +10,8 @@ struct ConstructionResult {
     Node* out;
 };
 
+Node* inner_get_cfg(std::vector<Stmt*>& program);
+
 inline ConstructionResult make_assign_node(Stmt& s) {
     Node* node = new Node;
     node->stmt.kind = ASSIGNMENT;
@@ -63,7 +65,7 @@ inline ConstructionResult make_block_node(Stmt& s) {
 
     assert(s.kind == BLOCK_STMT);
 
-    Node* root = get_cfg(s.as.block.stmts);
+    Node* root = inner_get_cfg(s.as.block.stmts);
 
     Node* cursor = root;
     while (cursor->false_edge) {
@@ -139,9 +141,7 @@ inline ConstructionResult make_while(Stmt& s) {
     return r;
 }
 
-
-Node* get_cfg(std::vector<Stmt*>& program) {
-
+Node* inner_get_cfg(std::vector<Stmt*>& program) {
     Node* root = make_nop().root;
     Node* prev = root;
 
@@ -176,6 +176,10 @@ Node* get_cfg(std::vector<Stmt*>& program) {
     return root;
 }
 
+CFG get_cfg(std::vector<Stmt*>& program) {
+    return CFG { inner_get_cfg(program) };
+}
+
 static std::string label(const CFGStmt& s, SyntheticPP pp) {
 
     switch (s.kind) {
@@ -192,9 +196,11 @@ static std::string label(const CFGStmt& s, SyntheticPP pp) {
 }
 
 
-bool write_cfg_dot(const Node* entry, const char* path) {
+bool write_cfg_dot(CFG cfg, const char* path) {
     FILE* f = fopen(path, "w");
     if (!f) return false;
+
+    const Node* entry = cfg.root;
 
     fputs("digraph CFG {\n  node [shape=box];\n", f);
 
