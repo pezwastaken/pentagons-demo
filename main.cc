@@ -2,7 +2,7 @@
 #include <string>
 #include "arena.hh"
 #include "cfg.hh"
-
+#include "environment.hh"
 
 int main() {
 
@@ -37,6 +37,5 @@ int main() {
     arena_destroy(p.arena);
 
     return 0;
-
 }
 

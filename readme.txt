@@ -1,4 +1,8 @@
 
+int a = 0;
+
+int b = 1;
+
 int xy = a + b + c;
 a / c;
 

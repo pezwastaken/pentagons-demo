@@ -3,6 +3,8 @@
 #include <iostream>
 #include <unordered_set>
 
+static u32 id_tracker = 0U;
+
 struct ConstructionResult {
     Node* root;
     Node* out;
@@ -15,6 +17,7 @@ inline ConstructionResult make_assign_node(Stmt& s) {
     node->stmt.rhs = s.as.assign.expr;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
+    node->pp = SyntheticPP {id_tracker++};
 
     ConstructionResult r = ConstructionResult {node, node};
     return r;
@@ -27,6 +30,7 @@ inline ConstructionResult make_decl_node(Stmt& s) {
     node->stmt.rhs = s.as.decl.expr;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
+    node->pp = SyntheticPP {id_tracker++};
     ConstructionResult r = ConstructionResult {node, node};
     return r;
 }
@@ -38,6 +42,7 @@ inline ConstructionResult make_expr_node(Stmt& s) {
     node->stmt.expr = s.as.expr.expr;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
+    node->pp = SyntheticPP {id_tracker++};
     ConstructionResult r = ConstructionResult {node, node};
     return r;
 }
@@ -47,10 +52,10 @@ inline ConstructionResult make_nop() {
     node->stmt.kind = NOP;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
+    node->pp = SyntheticPP {id_tracker++};
     ConstructionResult r = ConstructionResult {node, node};
     return r;
 }
-
 
 inline ConstructionResult make_block_node(Stmt& s) {
 
@@ -80,6 +85,7 @@ inline ConstructionResult make_if(Stmt& s) {
     node->stmt.expr = s.as.if_stmt.guard;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
+    node->pp = SyntheticPP {id_tracker++};
 
     assert(s.as.if_stmt.then_branch != nullptr);
     assert(s.as.if_stmt.then_branch->kind == BLOCK_STMT);
@@ -115,6 +121,7 @@ inline ConstructionResult make_while(Stmt& s) {
     node->stmt.expr = s.as.while_stmt.guard;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
+    node->pp = SyntheticPP {id_tracker++};
 
     assert(s.as.while_stmt.then_branch != nullptr);
     assert(s.as.while_stmt.then_branch->kind == BLOCK_STMT);
@@ -169,15 +176,15 @@ Node* get_cfg(std::vector<Stmt*>& program) {
     return root;
 }
 
-static std::string label(const CFGStmt& s) {
+static std::string label(const CFGStmt& s, SyntheticPP pp) {
 
     switch (s.kind) {
         case DECLARATION:
-            return "decl " + std::string(s.name.lexeme) + (s.rhs ? " = " + dump_expr(*s.rhs) : std::string());
+            return "[" + std::to_string(pp.line) + "]" + "decl " + std::string(s.name.lexeme) + (s.rhs ? " = " + dump_expr(*s.rhs) : std::string());
         case ASSIGNMENT:
-            return dump_expr(*s.lhs) + " = " + dump_expr(*s.rhs);
+            return "[" + std::to_string(pp.line) + "]" + dump_expr(*s.lhs) + " = " + dump_expr(*s.rhs);
         case EXPR:
-            return dump_expr(*s.expr);
+            return "[" + std::to_string(pp.line) + "]" + dump_expr(*s.expr);
         case NOP:
             return "nop";
     }
@@ -200,7 +207,7 @@ bool write_cfg_dot(const Node* entry, const char* path) {
         if (!n || !seen.insert(n).second) continue;
 
         bool branch = n->true_edge && n->false_edge;
-        fprintf(f, "  n%p [label=\"%s\"];\n", (const void*)n, label(n->stmt).c_str());
+        fprintf(f, "  n%p [label=\"%s\"];\n", (const void*)n, label(n->stmt, n->pp).c_str());
         if (n->true_edge)
             fprintf(f, "  n%p -> n%p%s;\n", (const void*)n, (const void*)n->true_edge,
                     branch ? " [label=\"T\"]" : "");
@@ -216,6 +223,7 @@ bool write_cfg_dot(const Node* entry, const char* path) {
     fclose(f);
     return true;
 }
+
 
 
 

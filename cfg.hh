@@ -2,6 +2,10 @@
 
 #include "parser.hh"
 
+struct SyntheticPP {
+    u32 line;
+};
+
 enum CFGStmtKind {
     DECLARATION,
     ASSIGNMENT,
@@ -29,6 +33,8 @@ struct Node {
 
     Node* true_edge = nullptr;
     Node* false_edge = nullptr;
+
+    SyntheticPP pp;
 };
 
 Node* get_cfg(std::vector<Stmt*>& program);

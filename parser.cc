@@ -61,7 +61,7 @@ static inline std::optional<Token> expect(Parser& p, TokenType t) {
 static inline Expr* make_literal (Parser& parser, Token t) {
     Expr* e = arena_new<Expr>(parser.arena);
     e->kind = LITERAL_EXPR,
-    e-> token = t;
+    e->token = t;
     e->type = t.literal.type;
     e->left = nullptr;
     e->right = nullptr;
@@ -72,7 +72,7 @@ static inline Expr* make_literal (Parser& parser, Token t) {
 static inline Expr* make_variable (Parser& parser, Token t) {
     Expr* e = arena_new<Expr>(parser.arena);
     e->kind = VARIABLE_EXPR,
-    e-> token = t;
+    e->token = t;
     e->type = INT;
     e->left = nullptr;
     e->right = nullptr;
@@ -83,7 +83,7 @@ static inline Expr* make_variable (Parser& parser, Token t) {
 static inline Expr* make_binary (Parser& parser, Token op, Expr* left, Expr* right) {
     Expr* e = arena_new<Expr>(parser.arena);
     e->kind = BINARY_EXPR,
-    e-> token = op;
+    e->token = op;
     e->type = INT;
     e->left = left;
     e->right = right;

@@ -30,7 +30,7 @@ struct Literal {
 
     StaticType type;
     union {
-        i32 int_value;
+        isize int_value;
         bool bool_value;
     } value;
 
