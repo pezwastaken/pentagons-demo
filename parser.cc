@@ -253,7 +253,7 @@ static inline Stmt* parse_while(Parser& p) {
     while_stmt->kind = WHILE_STMT;
     while_stmt->token = kw;
     while_stmt->as.while_stmt.guard = guard;
-    while_stmt->as.if_stmt.then_branch = then_body;
+    while_stmt->as.while_stmt.then_branch = then_body;
 
     return while_stmt;
 }
@@ -287,7 +287,7 @@ static inline Stmt* parse_statement(Parser& p) {
         case IF:
             return parse_if(p);
         case WHILE:
-            return parse_if(p);
+            return parse_while(p);
         case LEFT_BRACE:
             return parse_block(p);
         default:
@@ -324,6 +324,9 @@ std::string dump_stmt(const Stmt& s) {
         return "if " + dump_expr(*s.as.if_stmt.guard)
             + dump_stmt(*s.as.if_stmt.then_branch) + " else " +
             (s.as.if_stmt.else_branch ? dump_stmt(*s.as.if_stmt.else_branch) : "");
+    case WHILE_STMT:
+        return "while " + dump_expr(*s.as.while_stmt.guard)
+            + dump_stmt(*s.as.while_stmt.then_branch);
     case BLOCK_STMT:
         {
             std::string res = "{\n";

@@ -54,6 +54,8 @@ inline ConstructionResult make_nop() {
 
 inline ConstructionResult make_block_node(Stmt& s) {
 
+    std::cout << "making block" << std::endl;
+
     assert(s.kind == BLOCK_STMT);
 
     Node* root = get_cfg(s.as.block.stmts);
@@ -70,6 +72,7 @@ inline ConstructionResult make_block_node(Stmt& s) {
 
 inline ConstructionResult make_if(Stmt& s) {
 
+    std::cout << "making if" << std::endl;
     assert(s.kind == IF_STMT);
 
     Node* node = new Node;
@@ -101,6 +104,34 @@ inline ConstructionResult make_if(Stmt& s) {
     return r;
 }
 
+inline ConstructionResult make_while(Stmt& s) {
+
+    std::cout << "making while cfg" << std::endl;
+
+    assert(s.kind == WHILE_STMT);
+
+    Node* node = new Node;
+    node->stmt.kind = EXPR;
+    node->stmt.expr = s.as.while_stmt.guard;
+    node->true_edge = nullptr;
+    node->false_edge = nullptr;
+
+    assert(s.as.while_stmt.then_branch != nullptr);
+    assert(s.as.while_stmt.then_branch->kind == BLOCK_STMT);
+
+    Node* exit = make_nop().root;
+
+    ConstructionResult then_branch_res = make_block_node(*s.as.while_stmt.then_branch);
+
+    node->true_edge = then_branch_res.root;
+    node->false_edge = exit;
+
+    then_branch_res.out->true_edge = node;
+
+    ConstructionResult r = ConstructionResult {node, exit};
+    return r;
+}
+
 
 Node* get_cfg(std::vector<Stmt*>& program) {
 
@@ -111,15 +142,13 @@ Node* get_cfg(std::vector<Stmt*>& program) {
 
     for (auto s : program) {
 
-        std::cout << "s kind: " << s->kind << std::endl;
-
         switch (s->kind) {
 
         case ASSIGN_STMT: r = make_assign_node(*s); break;
         case EXPR_STMT: r = make_expr_node(*s); break;
         case DECL_STMT: r = make_decl_node(*s); break;
         case IF_STMT: r = make_if(*s); break;
-        case WHILE_STMT:
+        case WHILE_STMT: r = make_while(*s); break;
         case BLOCK_STMT: r = make_block_node(*s); break;
         default:
             UNREACHABLE;
@@ -129,17 +158,15 @@ Node* get_cfg(std::vector<Stmt*>& program) {
         prev = r.out;
     }
 
-    assert (root->true_edge != nullptr);
-    return root->true_edge;
-}
+    assert (root != nullptr);
+#ifndef NDEBUG
+    if (root->stmt.kind != NOP)
+        assert(root->true_edge != nullptr);
+#endif
 
-
-void debug_cfg(Node* root) {
-
-    while (root != nullptr) {
-        std::cout << root->stmt.kind << std::endl;
-        root = root->true_edge;
-    }
+    if (root->true_edge != nullptr)
+        return root->true_edge;
+    return root;
 }
 
 static std::string label(const CFGStmt& s) {
