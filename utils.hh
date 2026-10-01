@@ -7,6 +7,8 @@
 #define TODO (exit(1))
 #define UNREACHABLE (assert(false))
 
+#define OUT
+
 using i32 = int;
 using isize = long long;
 using u32 = unsigned int;

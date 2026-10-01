@@ -55,7 +55,7 @@ struct Literal {
 
 
 struct Token {
-    std::string lexeme;
+    std::string_view lexeme;
     Literal literal;
     u32 line;
     TokenType type;
@@ -67,10 +67,8 @@ struct Token {
         type = END_OF_FILE;
     }
 
-    Token(std::string lexeme, Literal literal, u32 line, TokenType type) :
+    Token(std::string_view lexeme, Literal literal, u32 line, TokenType type) :
         lexeme(lexeme), literal(literal), line(line), type(type) { }
-
-    ~Token() { }
 
 };
 

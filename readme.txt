@@ -1,4 +1,9 @@
 
 int xy = a + b + c;
-int z = a / c;
+a / c;
+
+if (x == 2) {
+	int x = 0;
+}
+
 

@@ -33,6 +33,8 @@ int main() {
     Node* cfg_root = get_cfg(program);
     debug_cfg(cfg_root);
 
+    bool done = write_cfg_dot(cfg_root, "out.dot");
+
     arena_destroy(p.arena);
 
     return 0;

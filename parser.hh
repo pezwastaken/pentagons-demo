@@ -75,4 +75,6 @@ struct Stmt {
 
 std::vector<Stmt*> parse_program(Parser& p, std::vector<ParseError> errors);
 
+std::string dump_expr(const Expr& expr);
 std::string dump_stmt(const Stmt& s);
+

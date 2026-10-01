@@ -137,16 +137,16 @@ static inline Expr* parse_expr(Parser& parser, i32 min_prec = 1) {
 
 }
 
-static inline std::string dump_expr(const Expr& expr) {
+std::string dump_expr(const Expr& expr) {
     switch (expr.kind) {
     case LITERAL_EXPR:
-        return expr.token.lexeme;
+        return std::string(expr.token.lexeme);
     case VARIABLE_EXPR:
-        return expr.token.lexeme;
+        return std::string(expr.token.lexeme);
     case UNARY_EXPR:
-        return " ( " + expr.token.lexeme + dump_expr(*expr.left) + " ) ";
+        return " ( " + std::string(expr.token.lexeme) + dump_expr(*expr.left) + " ) ";
     case BINARY_EXPR:
-        return " ( " + expr.token.lexeme + " " + dump_expr(*expr.left) + ", " +
+        return " ( " + std::string(expr.token.lexeme) + " " + dump_expr(*expr.left) + ", " +
             dump_expr(*expr.right) + " ) ";
     default:
         UNREACHABLE;
@@ -315,9 +315,11 @@ std::vector<Stmt*> parse_program(Parser& p, std::vector<ParseError> errors) {
 std::string dump_stmt(const Stmt& s) {
     switch (s.kind) {
     case DECL_STMT:
-        return s.token.lexeme + " " + s.as.decl.name.lexeme + " = " + (dump_expr(*s.as.decl.expr));
+        return std::string(s.token.lexeme) + " " + std::string(s.as.decl.name.lexeme) + " = " + (dump_expr(*s.as.decl.expr));
     case ASSIGN_STMT:
-        return s.as.assign.target->token.lexeme + " = " + (dump_expr(*s.as.assign.expr));
+        return std::string(s.as.assign.target->token.lexeme) + " = " + (dump_expr(*s.as.assign.expr));
+    case EXPR_STMT:
+        return (dump_expr(*s.as.expr.expr));
     case IF_STMT:
         return "if " + dump_expr(*s.as.if_stmt.guard)
             + dump_stmt(*s.as.if_stmt.then_branch) + " else " +

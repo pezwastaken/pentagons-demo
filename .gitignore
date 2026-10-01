@@ -3,6 +3,8 @@
 
 *.dSYM/
 
+*.dot
+
 # Compiled Object files
 *.slo
 *.lo

@@ -1,6 +1,6 @@
 
-#include <iostream>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include "lexer.hh"
 
@@ -32,11 +32,14 @@ static inline bool more(const Scanner& scanner) {
 }
 
 static inline Token new_token(Scanner& scanner, TokenType tt) {
-    std::string lexeme = scanner.source->substr(scanner.start, scanner.current - scanner.start);
+
+    std::string_view lexeme =
+        std::string_view(*scanner.source).substr(
+            scanner.start, scanner.current - scanner.start);
 
     //int literal, convert to int first
     if (tt == NUMBER) {
-        int value = std::stoi(lexeme);
+        int value = std::stoi(std::string(lexeme));
         return Token(lexeme, Literal(StaticType::INT, &value), scanner.line, tt);
     }
 
@@ -83,11 +86,15 @@ static inline Token compute_number_literal(Scanner& scanner) {
 static inline Token compute_identifier(Scanner& scanner) {
     while (is_alphanumeric(peek(scanner))) advance(scanner);
 
-    std::string text = (*scanner.source).substr(scanner.start, scanner.current - scanner.start);
+    std::string_view text =
+        std::string_view(*scanner.source).substr(
+            scanner.start, scanner.current - scanner.start);
+
+    std::string text_str = std::string(text);
 
     TokenType tt = IDENTIFIER;
-    if (keywords.find(text) != keywords.end()) {
-        tt = keywords[text];
+    if (keywords.find(text_str) != keywords.end()) {
+        tt = keywords[text_str];
     }
 
     Token t = new_token(scanner, tt);
