@@ -7,10 +7,10 @@ struct SyntheticPP {
 };
 
 enum CFGStmtKind {
-    DECLARATION,
-    ASSIGNMENT,
-    EXPR,
-    NOP,
+    CFG_DECLARATION,
+    CFG_ASSIGNMENT,
+    CFG_EXPR,
+    CFG_NOP,
 };
 
 struct CFGStmt {
@@ -23,7 +23,7 @@ struct CFGStmt {
 
     CFGStmtKind kind;
 
-    explicit CFGStmt(CFGStmtKind k = NOP) : kind(k) {
+    explicit CFGStmt(CFGStmtKind k = CFG_NOP) : kind(k) {
 
     }
 };
@@ -36,11 +36,11 @@ struct Node {
 
     SyntheticPP pp;
 
-    // AnalysisData* data = nullptr;
+    usize id;
 };
 
 struct CFG {
-    const Node* root;
+    Node* root;
 };
 
 CFG get_cfg(std::vector<Stmt*>& program);

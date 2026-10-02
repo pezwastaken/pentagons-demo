@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <unordered_map>
 #include "parser.hh"
 #include "utils.hh"
@@ -29,6 +30,9 @@ concept ValueDomain = requires (V a, V b, isize n, const Expr& unary, const Expr
     { V::join(a, b) } -> std::same_as<V>;
     { V::widen(a, b) } -> std::same_as<V>;
     { V::leq(a, b) } -> std::same_as<Satisfiability>;
+    { V::dump_value(a) } -> std::same_as<std::string>;
+    { V::is_bottom(a) } -> std::same_as<bool>;
+    { V::is_top(a) } -> std::same_as<bool>;
 };
 
 
@@ -36,31 +40,100 @@ template <ValueDomain V>
 struct NonRelational {
 
     struct State {
+        AbstractElementKind kind;
         std::unordered_map<std::string, V> env;
-        bool reachable = false;
+        bool reachable = true;
     };
 
-    static V eval(const State& s, const Expr& e) {
+    static V eval(State& s, const Expr& e) {
         switch (e.kind) {
         case LITERAL_EXPR:
             return V::constant(e.token.literal.value.int_value);
         case VARIABLE_EXPR:
             return s.env[std::string(e.token.lexeme)];
         case UNARY_EXPR:
-            return V::unary(s, eval(s, *e.left));
+            return V::unary(e, eval(s, *e.left));
         case BINARY_EXPR:
-            return V::binary(s, eval(s, *e.left), eval(s, *e.right));
+            return V::binary(e, eval(s, *e.left), eval(s, *e.right));
           break;
         }
     }
 
     static State assign(State s, const std::string& name, const Expr& e) {
+        std::cout << "called non relational assign!" << std::endl;
+        assert(e.kind == LITERAL_EXPR);
         V value = eval(s, e);
-        s.env[name] = value;
-        return s;
+
+        std::cout << "eval during assign: " << V::dump_value(value) << std::endl;
+
+        if (!V::is_bottom(value)) {
+            s.kind = SOME;
+            s.env[name] = value;
+            return s;
+        }
+        else {
+            return bot_state();
+        }
+
     }
 
+    static State top_state() {
+        return State {.kind = TOP, .env = {}, .reachable = true};
+    }
 
+    static State bot_state() {
+        return State {.kind = BOT, .env = {}, .reachable = true};
+    }
+
+    static std::string dump_state(const State& s) {
+
+        if (s.kind == BOT)
+            return "[ BOT ]";
+        if (s.kind == TOP)
+            return "[ TOP ]";
+
+        std::string res = "[\n";
+        for (const auto& x : s.env) {
+            res += "\t" + x.first + V::dump_value(x.second);
+        }
+        res += "]\n";
+        return res;
+    }
+
+    static bool is_bottom(const State& s) {
+        return s.kind == BOT;
+    }
+
+    static bool is_top(const State& s) {
+        return s.kind == TOP;
+    }
+
+    static State join(const State& s1, const State& s2) {
+
+        if (s1.kind == TOP || s2.kind == TOP) {
+            return top_state();
+        }
+
+        if (s1.kind == BOT)
+            return s2;
+        if (s2.kind == BOT)
+            return s1;
+
+        State res = s1;
+        for (const auto& [name, v2] : s2.env) {
+
+            auto it_value = s1.env.find(name);
+            if (it_value != s1.env.end()) {
+
+                V value = V::join(v2, it_value->second);
+                res.env[name] = value;
+            }
+            else {
+                res.env[name] = v2;
+            }
+        }
+        return res;
+    }
 
 };
 
@@ -69,12 +142,17 @@ template <class D>
 concept StateDomain = requires(D::State s, const std::string& x, const Expr& e) {
 
     { D::assign(s, x, e) } -> std::same_as<typename D::State>;
+    { D::top_state() } -> std::same_as<typename D::State>;
+    { D::bot_state() } -> std::same_as<typename D::State>;
+    { D::dump_state(s) } -> std::same_as<std::string>;
+    { D::is_bottom(s) } -> std::same_as<bool>;
+    { D::is_top(s) } -> std::same_as<bool>;
+    { D::join(s, s) } -> std::same_as<typename D::State>;
 
     // { D::eval(s, e) } -> std::same_as<typename D::State>;
     // TODO: this should return a tuple <abstract value, abstract state> (function calls with side effects)
 
     // { D::assume(s, e) } -> std::same_as<typename D::State>;
-    // { D::join(s, s) } -> std::same_as<typename D::State>;
     // { D::widen(s, s) } -> std::same_as<typename D::State>;
 
 };
@@ -95,6 +173,7 @@ struct Interval {
     }
 
     static Interval constant(isize n) {
+        std::cout << "constant with value " << n << std::endl;
         return Interval {.kind = SOME, .low = n, .high = n};
     }
 
@@ -118,6 +197,24 @@ struct Interval {
         return SAT_UNKNOWN;
     }
 
+    static bool is_bottom(Interval a) {
+        return a.kind == BOT;
+    }
+
+    static bool is_top(Interval a) {
+        return a.kind == TOP;
+    }
+
+    static std::string dump_value(Interval a) {
+        switch (a.kind) {
+        case SOME:
+            return "[ " + std::to_string(a.low) + ", " + std::to_string(a.high) + " ] ";
+        case TOP:
+            return "TOP";
+        case BOT:
+            return "BOT";
+        }
+    }
 
 };
 

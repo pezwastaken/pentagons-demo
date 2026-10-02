@@ -14,11 +14,12 @@ Node* inner_get_cfg(std::vector<Stmt*>& program);
 
 inline ConstructionResult make_assign_node(Stmt& s) {
     Node* node = new Node;
-    node->stmt.kind = ASSIGNMENT;
+    node->stmt.kind = CFG_ASSIGNMENT;
     node->stmt.lhs = s.as.assign.target;
     node->stmt.rhs = s.as.assign.expr;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
+    node->id = id_tracker;
     node->pp = SyntheticPP {id_tracker++};
 
     ConstructionResult r = ConstructionResult {node, node};
@@ -27,11 +28,12 @@ inline ConstructionResult make_assign_node(Stmt& s) {
 
 inline ConstructionResult make_decl_node(Stmt& s) {
     Node* node = new Node;
-    node->stmt.kind = DECLARATION;
+    node->stmt.kind = CFG_DECLARATION;
     node->stmt.name = s.as.decl.name;
     node->stmt.rhs = s.as.decl.expr;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
+    node->id = id_tracker;
     node->pp = SyntheticPP {id_tracker++};
     ConstructionResult r = ConstructionResult {node, node};
     return r;
@@ -39,11 +41,12 @@ inline ConstructionResult make_decl_node(Stmt& s) {
 
 inline ConstructionResult make_expr_node(Stmt& s) {
     Node* node = new Node;
-    node->stmt.kind = EXPR;
+    node->stmt.kind = CFG_EXPR;
     assert(s.as.expr.expr != nullptr);
     node->stmt.expr = s.as.expr.expr;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
+    node->id = id_tracker;
     node->pp = SyntheticPP {id_tracker++};
     ConstructionResult r = ConstructionResult {node, node};
     return r;
@@ -51,9 +54,10 @@ inline ConstructionResult make_expr_node(Stmt& s) {
 
 inline ConstructionResult make_nop() {
     Node* node = new Node;
-    node->stmt.kind = NOP;
+    node->stmt.kind = CFG_NOP;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
+    node->id = id_tracker;
     node->pp = SyntheticPP {id_tracker++};
     ConstructionResult r = ConstructionResult {node, node};
     return r;
@@ -83,22 +87,27 @@ inline ConstructionResult make_if(Stmt& s) {
     assert(s.kind == IF_STMT);
 
     Node* node = new Node;
-    node->stmt.kind = EXPR;
+    node->stmt.kind = CFG_EXPR;
     node->stmt.expr = s.as.if_stmt.guard;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
+    node->id = id_tracker;
     node->pp = SyntheticPP {id_tracker++};
 
     assert(s.as.if_stmt.then_branch != nullptr);
     assert(s.as.if_stmt.then_branch->kind == BLOCK_STMT);
 
-    Node* join = make_nop().root;
-
     ConstructionResult then_branch_res = make_block_node(*s.as.if_stmt.then_branch);
+    ConstructionResult else_branch_res;
 
     if (s.as.if_stmt.else_branch != nullptr) {
-        ConstructionResult else_branch_res = make_block_node(*s.as.if_stmt.else_branch);
+        else_branch_res = make_block_node(*s.as.if_stmt.else_branch);
         node->false_edge = else_branch_res.root;
+    }
+
+    Node* join = make_nop().root;
+
+    if (s.as.if_stmt.else_branch != nullptr) {
         else_branch_res.out->true_edge = join;
     }
     else {
@@ -119,10 +128,11 @@ inline ConstructionResult make_while(Stmt& s) {
     assert(s.kind == WHILE_STMT);
 
     Node* node = new Node;
-    node->stmt.kind = EXPR;
+    node->stmt.kind = CFG_EXPR;
     node->stmt.expr = s.as.while_stmt.guard;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
+    node->id = id_tracker;
     node->pp = SyntheticPP {id_tracker++};
 
     assert(s.as.while_stmt.then_branch != nullptr);
@@ -167,7 +177,7 @@ Node* inner_get_cfg(std::vector<Stmt*>& program) {
 
     assert (root != nullptr);
 #ifndef NDEBUG
-    if (root->stmt.kind != NOP)
+    if (root->stmt.kind != CFG_NOP)
         assert(root->true_edge != nullptr);
 #endif
 
@@ -180,17 +190,17 @@ CFG get_cfg(std::vector<Stmt*>& program) {
     return CFG { inner_get_cfg(program) };
 }
 
-static std::string label(const CFGStmt& s, SyntheticPP pp) {
+static std::string label(const CFGStmt& s, usize id) {
 
     switch (s.kind) {
-        case DECLARATION:
-            return "[" + std::to_string(pp.line) + "]" + "decl " + std::string(s.name.lexeme) + (s.rhs ? " = " + dump_expr(*s.rhs) : std::string());
-        case ASSIGNMENT:
-            return "[" + std::to_string(pp.line) + "]" + dump_expr(*s.lhs) + " = " + dump_expr(*s.rhs);
-        case EXPR:
-            return "[" + std::to_string(pp.line) + "]" + dump_expr(*s.expr);
-        case NOP:
-            return "nop";
+        case CFG_DECLARATION:
+            return "[" + std::to_string(id) + "]" + "decl " + std::string(s.name.lexeme) + (s.rhs ? " = " + dump_expr(*s.rhs) : std::string());
+        case CFG_ASSIGNMENT:
+            return "[" + std::to_string(id) + "]" + dump_expr(*s.lhs) + " = " + dump_expr(*s.rhs);
+        case CFG_EXPR:
+            return "[" + std::to_string(id) + "]" + dump_expr(*s.expr);
+        case CFG_NOP:
+            return "[" + std::to_string(id) + "]" + " nop";
     }
     return "?";
 }
@@ -213,7 +223,7 @@ bool write_cfg_dot(CFG cfg, const char* path) {
         if (!n || !seen.insert(n).second) continue;
 
         bool branch = n->true_edge && n->false_edge;
-        fprintf(f, "  n%p [label=\"%s\"];\n", (const void*)n, label(n->stmt, n->pp).c_str());
+        fprintf(f, "  n%p [label=\"%s\"];\n", (const void*)n, label(n->stmt, n->id).c_str());
         if (n->true_edge)
             fprintf(f, "  n%p -> n%p%s;\n", (const void*)n, (const void*)n->true_edge,
                     branch ? " [label=\"T\"]" : "");

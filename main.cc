@@ -3,6 +3,7 @@
 #include "arena.hh"
 #include "cfg.hh"
 #include "environment.hh"
+#include "fixpoint.hh"
 
 int main() {
 
@@ -13,11 +14,11 @@ int main() {
 
     std::vector<Token> tokens = scan_tokens(source);
 
-    for (Token t : tokens) {
-        std::cout << t.lexeme << std::endl;
-        std::cout << t.type << std::endl;
-        std::cout << std::endl;
-    }
+    // for (Token t : tokens) {
+    //     std::cout << t.lexeme << std::endl;
+    //     std::cout << t.type << std::endl;
+    //     std::cout << std::endl;
+    // }
 
     Arena* mem_arena = arena_create(1000000);
     Parser p = Parser {tokens, {}, 0U, mem_arena};
@@ -30,9 +31,11 @@ int main() {
         std::cout << dump_stmt(*s) << std::endl;
     }
 
-    CFG cfg_root = get_cfg(program);
+    CFG cfg = get_cfg(program);
 
-    bool done = write_cfg_dot(cfg_root, "out.dot");
+    bool done = write_cfg_dot(cfg, "out.dot");
+
+    fixpoint_analyze<NonRelational<Interval>>(cfg);
 
     arena_destroy(p.arena);
 
