@@ -2,8 +2,8 @@
 
 #include "cfg.hh"
 #include "environment.hh"
+#include "html_dump.hh"
 #include <iostream>
-
 
 template <StateDomain D>
 typename D::State transfer_declaration(typename D::State& entry_state, Node* n) {
@@ -56,8 +56,11 @@ typename D::State transfer(typename D::State entry_state, Node* n) {
     case CFG_ASSIGNMENT:
         return transfer_assign<D>(entry_state, n);
     case CFG_EXPR:
+        // TODO
     case CFG_NOP:
         return entry_state;
+    case CFG_RETURN:
+        return entry_state; // TODO
     }
 
     return D::top_state();
@@ -95,7 +98,6 @@ void fixpoint_analyze(const CFG& cfg) {
 
             S joined = D::join(out_state, prev);
 
-            // TODO: if ! out_state leq prev then add next
             if (!D::leq(joined, prev)) {
 
                 std::cout << "dumping state after join (worklist) for node " <<
@@ -112,5 +114,9 @@ void fixpoint_analyze(const CFG& cfg) {
         std::cout << "state for node id: " << id << D::dump_state(node_states[id])
             << std::endl;
     }
+
+    html_dump_fixpoint(cfg, FixpointResult<D> {node_states});
 }
+
+
 

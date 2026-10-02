@@ -94,7 +94,7 @@ struct NonRelational {
 
         std::string res = "[\n";
         for (const auto& x : s.env) {
-            res += "\t" + x.first + V::dump_value(x.second);
+            res += "\t" + x.first + " = " + V::dump_value(x.second) + "\n";
         }
         res += "]\n";
         return res;
@@ -247,5 +247,10 @@ struct Interval {
 static_assert(ValueDomain<Interval>);
 static_assert(StateDomain<NonRelational<Interval>>);
 
+
+template <StateDomain D>
+struct FixpointResult {
+    std::unordered_map<usize, typename D::State> node_states;
+};
 
 
