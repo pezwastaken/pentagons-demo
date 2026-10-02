@@ -1,5 +1,6 @@
 #include <iostream>
 #include "parser.hh"
+#include "lexer.hh"
 
 struct OpInfo {
     i32 prec;
@@ -279,6 +280,23 @@ static inline Stmt* parse_block(Parser& p) {
     return block;
 }
 
+static inline Stmt* parse_return(Parser& p) {
+
+    Token kw = advance(p);
+    assert(kw.type == RETURN);
+
+    Expr* expr = parse_expr(p);
+
+    if (!match(p, SEMICOLON)) p.errors.push_back({"expected semicolon after return"});
+
+    Stmt* ret_stmt = arena_new<Stmt>(p.arena);
+    ret_stmt->kind = RET_STMT;
+    ret_stmt->token = kw;
+    ret_stmt->as.ret_stmt.expr = expr;
+
+    return ret_stmt;
+}
+
 static inline Stmt* parse_statement(Parser& p) {
 
     switch (peek(p).type) {
@@ -290,6 +308,8 @@ static inline Stmt* parse_statement(Parser& p) {
             return parse_while(p);
         case LEFT_BRACE:
             return parse_block(p);
+        case RETURN:
+            return parse_return(p);
         default:
             return parse_assignment_or_expr(p);
     }
@@ -320,6 +340,8 @@ std::string dump_stmt(const Stmt& s) {
         return std::string(s.as.assign.target->token.lexeme) + " = " + (dump_expr(*s.as.assign.expr));
     case EXPR_STMT:
         return (dump_expr(*s.as.expr.expr));
+    case RET_STMT:
+        return ("return " + dump_expr(*s.as.ret_stmt.expr));
     case IF_STMT:
         return "if " + dump_expr(*s.as.if_stmt.guard)
             + dump_stmt(*s.as.if_stmt.then_branch) + " else " +

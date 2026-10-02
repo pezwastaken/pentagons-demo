@@ -29,10 +29,10 @@ concept ValueDomain = requires (V a, V b, isize n, const Expr& unary, const Expr
     { V::binary(binary, a, b) } -> std::same_as<V>;
     { V::join(a, b) } -> std::same_as<V>;
     { V::widen(a, b) } -> std::same_as<V>;
-    { V::leq(a, b) } -> std::same_as<Satisfiability>;
     { V::dump_value(a) } -> std::same_as<std::string>;
     { V::is_bottom(a) } -> std::same_as<bool>;
     { V::is_top(a) } -> std::same_as<bool>;
+    { V::leq(a, b) } -> std::same_as<bool>;
 };
 
 
@@ -135,6 +135,30 @@ struct NonRelational {
         return res;
     }
 
+    static bool leq(const State& s1, const State& s2) {
+
+        if (s2.kind == TOP)
+            return true;
+
+        if (s1.kind == TOP && s2.kind == TOP)
+            return true;
+
+        if (s2.kind == BOT)
+            return s1.kind == BOT;
+
+        for (const auto& [name, value] : s1.env) {
+            auto it = s2.env.find(name);
+            if (it == s2.env.end())
+                return false;
+            else {
+                V value2 = it->second;
+                if (!V::leq(value, value2))
+                    return false;
+            }
+        }
+        return true;
+    }
+
 };
 
 
@@ -148,6 +172,7 @@ concept StateDomain = requires(D::State s, const std::string& x, const Expr& e) 
     { D::is_bottom(s) } -> std::same_as<bool>;
     { D::is_top(s) } -> std::same_as<bool>;
     { D::join(s, s) } -> std::same_as<typename D::State>;
+    { D::leq(s, s) } -> std::same_as<bool>;
 
     // { D::eval(s, e) } -> std::same_as<typename D::State>;
     // TODO: this should return a tuple <abstract value, abstract state> (function calls with side effects)
@@ -193,16 +218,16 @@ struct Interval {
         return top();
     }
 
-    static Satisfiability leq(Interval a, Interval b) {
-        return SAT_UNKNOWN;
-    }
-
     static bool is_bottom(Interval a) {
         return a.kind == BOT;
     }
 
     static bool is_top(Interval a) {
         return a.kind == TOP;
+    }
+
+    static bool leq(Interval a, Interval b) {
+        return (a.low >= b.low && a.high <= b.high);
     }
 
     static std::string dump_value(Interval a) {

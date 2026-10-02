@@ -78,9 +78,7 @@ void fixpoint_analyze(const CFG& cfg) {
     std::deque<Node*> que;
     que.push_back(root);
 
-    int i = 0;
-
-    while (!que.empty() && i < 2) {
+    while (!que.empty()) {
 
         Node* x = que.front();
         que.pop_front();
@@ -89,31 +87,30 @@ void fixpoint_analyze(const CFG& cfg) {
 
         S out_state = transfer<D>(entry_state, x);
 
-
         if (x->true_edge != nullptr) {
-            const Node* dest = x->true_edge;
+            Node* dest = x->true_edge;
             usize dest_id = dest->id;
 
             S prev = node_states[dest_id];
 
-            // TODO: if out_state leq prev then stop
-
             S joined = D::join(out_state, prev);
 
-            std::cout << "dumping state after join (worklist) for node " <<
-                dest_id << D::dump_state(joined) << std::endl;
+            // TODO: if ! out_state leq prev then add next
+            if (!D::leq(joined, prev)) {
 
-            node_states[dest_id] = joined;
+                std::cout << "dumping state after join (worklist) for node " <<
+                    dest_id << D::dump_state(joined) << std::endl;
+
+                node_states[dest_id] = joined;
+
+                que.push_back(dest);
+            }
         }
-
-        Node* out_1 = x->true_edge;
-        que.push_back(out_1);
-
-        i++;
     }
 
-    std::cout << D::dump_state(node_states[1U]) << std::endl;
-    std::cout << D::dump_state(node_states[2U]) << std::endl;
-    std::cout << D::dump_state(node_states[3U]) << std::endl;
+    for (const auto& [id, state] : node_states) {
+        std::cout << "state for node id: " << id << D::dump_state(node_states[id])
+            << std::endl;
+    }
 }
 

@@ -52,6 +52,19 @@ inline ConstructionResult make_expr_node(Stmt& s) {
     return r;
 }
 
+inline ConstructionResult make_ret_node(Stmt& s) {
+    Node* node = new Node;
+    node->stmt.kind = CFG_RETURN;
+    assert(s.as.ret_stmt.expr != nullptr);
+    node->stmt.expr = s.as.ret_stmt.expr;
+    node->true_edge = nullptr;
+    node->false_edge = nullptr;
+    node->id = id_tracker;
+    node->pp = SyntheticPP {id_tracker++};
+    ConstructionResult r = ConstructionResult {node, node};
+    return r;
+}
+
 inline ConstructionResult make_nop() {
     Node* node = new Node;
     node->stmt.kind = CFG_NOP;
@@ -164,6 +177,7 @@ Node* inner_get_cfg(std::vector<Stmt*>& program) {
         case ASSIGN_STMT: r = make_assign_node(*s); break;
         case EXPR_STMT: r = make_expr_node(*s); break;
         case DECL_STMT: r = make_decl_node(*s); break;
+        case RET_STMT: r = make_ret_node(*s); break;
         case IF_STMT: r = make_if(*s); break;
         case WHILE_STMT: r = make_while(*s); break;
         case BLOCK_STMT: r = make_block_node(*s); break;
@@ -199,6 +213,8 @@ static std::string label(const CFGStmt& s, usize id) {
             return "[" + std::to_string(id) + "]" + dump_expr(*s.lhs) + " = " + dump_expr(*s.rhs);
         case CFG_EXPR:
             return "[" + std::to_string(id) + "]" + dump_expr(*s.expr);
+        case CFG_RETURN:
+            return "[" + std::to_string(id) + "]" + " return " + dump_expr(*s.expr);
         case CFG_NOP:
             return "[" + std::to_string(id) + "]" + " nop";
     }

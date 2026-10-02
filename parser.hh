@@ -41,6 +41,7 @@ enum StmtKind {
     EXPR_STMT,
     ASSIGN_STMT,
     DECL_STMT,
+    RET_STMT,
     IF_STMT,
     WHILE_STMT,
     BLOCK_STMT,
@@ -56,6 +57,7 @@ struct Stmt {
         struct { Expr* expr; } expr;
         struct { Token name; Expr* expr; } decl;
         struct { Expr* target; Expr* expr; } assign;
+        struct { Expr* expr; } ret_stmt;
         struct { Expr* guard; Stmt* then_branch; Stmt* else_branch; } if_stmt;
         struct { Expr* guard; Stmt* then_branch; } while_stmt;
         struct { std::vector<Stmt*> stmts; } block;

@@ -10,6 +10,7 @@ enum CFGStmtKind {
     CFG_DECLARATION,
     CFG_ASSIGNMENT,
     CFG_EXPR,
+    CFG_RETURN,
     CFG_NOP,
 };
 
