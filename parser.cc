@@ -9,8 +9,17 @@ struct OpInfo {
     bool right_assoc;
 };
 
-static inline std::optional<BinaryOperatorKind> get_bin_op_kind(TokenType t) {
+static inline std::optional<UnaryOperatorKind> get_un_op_kind(TokenType t) {
+    switch(t) {
+    case MINUS: return OP_UNARY_NEG;
+    case BANG: return OP_UNARY_LOG_NEG;
+    default:
+        UNREACHABLE;
+        return std::nullopt;
+    }
+}
 
+static inline std::optional<BinaryOperatorKind> get_bin_op_kind(TokenType t) {
     switch(t) {
     case PLUS:
         return OP_BINARY_ADD;
@@ -94,6 +103,8 @@ static inline std::optional<Token> expect(Parser& p, TokenType t) {
     return std::nullopt;
 }
 
+static inline Expr* parse_expr(Parser& parser, i32 min_prec = 1);
+
 static inline Expr* make_literal (Parser& parser, Token t) {
     Expr* e = arena_new<Expr>(parser.arena);
     e->kind = LITERAL_EXPR,
@@ -128,6 +139,22 @@ static inline Expr* make_binary (Parser& parser, Token op_token, BinaryOperatorK
     return e;
 }
 
+static inline Expr* make_unary (Parser& parser, Token op_token, Expr* inner) {
+    Expr* e = arena_new<Expr>(parser.arena);
+    e->kind = UNARY_EXPR,
+    e->token = op_token;
+    e->un_op = get_un_op_kind(op_token.type).value();
+
+    // TODO this should be populated by the typechecker OR
+    // could even be done by the parser by simply looking at the operator
+    // (- -> int, ! -> bool)
+    e->type = INT;
+    e->left = inner;
+    e->right = nullptr;
+
+    return e;
+}
+
 static inline Expr* parse_atom(Parser& parser) {
 
     switch (peek(parser).type) {
@@ -146,15 +173,23 @@ static inline Expr* parse_unary(Parser& parser) {
 
     // TODO: parse unary expressions like ! and `-`
 
-    return parse_atom(parser);
+    switch (peek(parser).type) {
+
+    case MINUS:
+    case BANG: return make_unary(parser, advance(parser), parse_expr(parser));
+    case IDENTIFIER:
+    case NUMBER:
+    case FALSE:
+    case TRUE: return parse_atom(parser);
+    default:
+        return nullptr;
+    }
 
 }
 
-static inline Expr* parse_expr(Parser& parser, i32 min_prec = 1) {
+static inline Expr* parse_expr(Parser& parser, i32 min_prec) {
 
     Expr* left = parse_unary(parser);
-
-    if (left == nullptr) std::cout << "\tit's null" << std::endl;
 
     while (true) {
         OpInfo info = binary_op_info(peek(parser).type);

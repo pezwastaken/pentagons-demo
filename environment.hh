@@ -214,7 +214,12 @@ struct Interval {
     }
 
     static Interval unary(const Expr& unary, Interval a) {
-        return top();
+        switch (unary.un_op) {
+        case OP_UNARY_NEG:
+            return interval_negate(a);
+        default:
+            return bottom();
+        }
     }
 
     static Interval binary(const Expr& binary, Interval a, Interval b) {
@@ -295,6 +300,12 @@ private:
             a.high * b.low,
             a.high * b.high });
         return Interval {.kind = SOME, .low = l, .high = h };
+    }
+
+    static Interval interval_negate(Interval a) {
+        if (a.kind == TOP || a.kind == BOT)
+            return a;
+        return Interval {.kind = SOME, .low = -a.high, .high = -a.low };
     }
 
 };

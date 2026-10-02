@@ -8,19 +8,19 @@
 template <StateDomain D>
 typename D::State transfer_declaration(typename D::State& entry_state, Node* n) {
 
-    std::cout << "transfer declaration called" << std::endl;
+    // std::cout << "transfer declaration called" << std::endl;
 
     assert(n->stmt.kind == CFG_DECLARATION);
 
     std::string declaring_name = std::string(n->stmt.name.lexeme);
-    std::cout << "declaring name " << declaring_name << std::endl;
+    // std::cout << "declaring name " << declaring_name << std::endl;
     assert(declaring_name != "");
 
     typename D::State out = D::assign(entry_state, declaring_name, *n->stmt.rhs);
 
 
-    std::cout << "dumping state after assign of " << declaring_name <<
-        D::dump_state(out) << std::endl;
+    // std::cout << "dumping state after assign of " << declaring_name <<
+    //     D::dump_state(out) << std::endl;
 
 #ifndef NDEBUG
 
@@ -100,9 +100,9 @@ void fixpoint_analyze(const CFG& cfg) {
 
             if (!D::leq(joined, prev)) {
 
-                std::cout << "dumping state after join (worklist) for node " <<
-                    dest_id << D::dump_state(joined) << std::endl;
-
+                // std::cout << "dumping state after join (worklist) for node " <<
+                //     dest_id << D::dump_state(joined) << std::endl;
+                //
                 node_states[dest_id] = joined;
 
                 que.push_back(dest);
