@@ -13,12 +13,34 @@ enum ExprKind {
     BINARY_EXPR,
 };
 
+enum UnaryOperatorKind {
+    OP_UNARY_NEG,
+    OP_UNARY_LOG_NEG,
+};
+
+enum BinaryOperatorKind {
+    OP_BINARY_ADD,
+    OP_BINARY_DIFF,
+    OP_BINARY_MUL,
+    OP_BINARY_DIV,
+    OP_BINARY_EQ,
+    OP_BINARY_NE,
+    OP_BINARY_LT,
+    OP_BINARY_LE,
+    OP_BINARY_GT,
+    OP_BINARY_GE,
+    OP_BINARY_LOG_AND,
+    OP_BINARY_LOG_OR,
+};
+
 struct Expr {
 
     ExprKind kind;
     Token token;
     StaticType type;
 
+    UnaryOperatorKind un_op;
+    BinaryOperatorKind bin_op;
     Expr* left;
     Expr* right;
 

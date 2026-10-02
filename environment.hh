@@ -1,9 +1,20 @@
 #pragma once
 
+#include <algorithm>
+#include <climits>
 #include <iostream>
 #include <unordered_map>
 #include "parser.hh"
 #include "utils.hh"
+
+#define CHECK_TOP_BOT \
+if (a.kind == TOP || b.kind == TOP) \
+    return top(); \
+if (a.kind == BOT) \
+    return b; \
+if (b.kind == BOT) \
+    return a
+
 
 enum AbstractElementKind {
     SOME,
@@ -61,7 +72,7 @@ struct NonRelational {
 
     static State assign(State s, const std::string& name, const Expr& e) {
         std::cout << "called non relational assign!" << std::endl;
-        assert(e.kind == LITERAL_EXPR);
+
         V value = eval(s, e);
 
         std::cout << "eval during assign: " << V::dump_value(value) << std::endl;
@@ -190,11 +201,11 @@ struct Interval {
     isize high;
 
     static Interval bottom() {
-        return Interval {.kind = BOT, .low = 0, .high = 1};
+        return Interval {.kind = BOT, .low = 0, .high = -1};
     }
 
     static Interval top() {
-        return Interval {.kind = TOP, .low = 0, .high = 1};
+        return Interval {.kind = TOP, .low = LONG_MIN, .high = LONG_MAX};
     }
 
     static Interval constant(isize n) {
@@ -207,6 +218,26 @@ struct Interval {
     }
 
     static Interval binary(const Expr& binary, Interval a, Interval b) {
+        switch (binary.bin_op) {
+
+        case OP_BINARY_ADD:
+            return interval_sum(a, b);
+        case OP_BINARY_DIFF:
+            return interval_diff(a, b);
+        case OP_BINARY_MUL:
+            return interval_mul(a, b);
+        case OP_BINARY_DIV:
+        case OP_BINARY_EQ:
+        case OP_BINARY_NE:
+        case OP_BINARY_LT:
+        case OP_BINARY_LE:
+        case OP_BINARY_GT:
+        case OP_BINARY_GE:
+        case OP_BINARY_LOG_AND:
+        case OP_BINARY_LOG_OR:
+          break;
+        }
+
         return top();
     }
 
@@ -239,6 +270,31 @@ struct Interval {
         case BOT:
             return "BOT";
         }
+    }
+
+private:
+
+    static Interval interval_sum(Interval a, Interval b) {
+        CHECK_TOP_BOT;
+        return Interval {.kind = SOME, .low = a.low + b.low, .high = a.high + b.high};
+    }
+
+    static Interval interval_diff(Interval a, Interval b) {
+        CHECK_TOP_BOT;
+        return Interval {.kind = SOME, .low = a.low - b.high, .high = a.high + b.low};
+    }
+
+    static Interval interval_mul(Interval a, Interval b) {
+        CHECK_TOP_BOT;
+        isize l = std::min({ a.low * b.low,
+            a.low * b.high,
+            a.high * b.low,
+            a.high * b.high });
+        isize h = std::max({ a.low * b.low,
+            a.low * b.high,
+            a.high * b.low,
+            a.high * b.high });
+        return Interval {.kind = SOME, .low = l, .high = h };
     }
 
 };

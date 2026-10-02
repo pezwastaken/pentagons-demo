@@ -5,6 +5,7 @@
 
 *.dot
 *.html
+result.html
 
 # Compiled Object files
 *.slo

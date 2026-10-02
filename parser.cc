@@ -1,11 +1,46 @@
 #include <iostream>
+#include <optional>
 #include "parser.hh"
 #include "lexer.hh"
+#include "utils.hh"
 
 struct OpInfo {
     i32 prec;
     bool right_assoc;
 };
+
+static inline std::optional<BinaryOperatorKind> get_bin_op_kind(TokenType t) {
+
+    switch(t) {
+    case PLUS:
+        return OP_BINARY_ADD;
+    case MINUS:
+        return OP_BINARY_DIFF;
+    case SLASH:
+        return OP_BINARY_DIV;
+    case STAR:
+        return OP_BINARY_MUL;
+    case BANG_EQUAL:
+        return OP_BINARY_NE;
+    case EQUAL_EQUAL:
+        return OP_BINARY_EQ;
+    case GREATER:
+        return OP_BINARY_GT;
+    case GREATER_EQUAL:
+        return OP_BINARY_GE;
+    case LESS:
+        return OP_BINARY_LT;
+    case LESS_EQUAL:
+        return OP_BINARY_LE;
+    case AND:
+        return OP_BINARY_LOG_AND;
+    case OR:
+        return OP_BINARY_LOG_OR;
+    default:
+        UNREACHABLE;
+        return std::nullopt;
+    }
+}
 
 static inline OpInfo binary_op_info(TokenType t) {
 
@@ -81,10 +116,11 @@ static inline Expr* make_variable (Parser& parser, Token t) {
     return e;
 }
 
-static inline Expr* make_binary (Parser& parser, Token op, Expr* left, Expr* right) {
+static inline Expr* make_binary (Parser& parser, Token op_token, BinaryOperatorKind op, Expr* left, Expr* right) {
     Expr* e = arena_new<Expr>(parser.arena);
     e->kind = BINARY_EXPR,
-    e->token = op;
+    e->token = op_token;
+    e->bin_op = op;
     e->type = INT;
     e->left = left;
     e->right = right;
@@ -126,12 +162,13 @@ static inline Expr* parse_expr(Parser& parser, i32 min_prec = 1) {
         if (info.prec == -1 || info.prec < min_prec)
             break;
 
-        Token op = advance(parser);
+        Token op_token = advance(parser);
 
         int next_min = info.right_assoc ? info.prec : info.prec + 1;
         Expr* right = parse_expr(parser, next_min);
 
-        left = make_binary(parser, op, left, right);
+        BinaryOperatorKind op = get_bin_op_kind(op_token.type).value();
+        left = make_binary(parser, op_token, op, left, right);
     }
 
     return left;
