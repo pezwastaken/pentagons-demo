@@ -4,23 +4,18 @@
 #include "environment.hh"
 #include "html_dump.hh"
 #include <iostream>
+#include <deque>
 
 template <StateDomain D>
 typename D::State transfer_declaration(typename D::State& entry_state, Node* n) {
 
-    // std::cout << "transfer declaration called" << std::endl;
-
     assert(n->stmt.kind == CFG_DECLARATION);
 
     std::string declaring_name = std::string(n->stmt.name.lexeme);
-    // std::cout << "declaring name " << declaring_name << std::endl;
     assert(declaring_name != "");
 
     typename D::State out = D::assign(entry_state, declaring_name, *n->stmt.rhs);
 
-
-    // std::cout << "dumping state after assign of " << declaring_name <<
-    //     D::dump_state(out) << std::endl;
 
 #ifndef NDEBUG
 

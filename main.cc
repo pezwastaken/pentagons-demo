@@ -14,6 +14,8 @@ int main() {
 
     std::vector<Token> tokens = scan_tokens(source);
 
+    std::cout << "scanned " << tokens.size() << " tokens" << std::endl;
+
     // for (Token t : tokens) {
     //     std::cout << t.lexeme << std::endl;
     //     std::cout << t.type << std::endl;
@@ -22,6 +24,8 @@ int main() {
 
     Arena* mem_arena = arena_create(1000000);
     Parser p = Parser {tokens, {}, 0U, mem_arena};
+
+    std::cout << "before parser" << std::endl;
 
     std::vector<Stmt*> program = parse_program(p, {});
 

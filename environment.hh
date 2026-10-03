@@ -51,9 +51,10 @@ template <ValueDomain V>
 struct NonRelational {
 
     struct State {
-        AbstractElementKind kind;
+        AbstractElementKind kind = BOT;
         std::unordered_map<std::string, V> env;
         bool reachable = true;
+
     };
 
     static V eval(State& s, const Expr& e) {
@@ -66,13 +67,12 @@ struct NonRelational {
             return V::unary(e, eval(s, *e.left));
         case BINARY_EXPR:
             return V::binary(e, eval(s, *e.left), eval(s, *e.right));
-          break;
+        default:
+            return V::top();
         }
     }
 
     static State assign(State s, const std::string& name, const Expr& e) {
-        std::cout << "called non relational assign!" << std::endl;
-
         V value = eval(s, e);
 
         std::cout << "eval during assign: " << V::dump_value(value) << std::endl;
@@ -274,6 +274,9 @@ struct Interval {
             return "TOP";
         case BOT:
             return "BOT";
+        default:
+            UNREACHABLE;
+            return "unknown value";
         }
     }
 

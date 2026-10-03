@@ -107,7 +107,7 @@ static inline Expr* parse_expr(Parser& parser, i32 min_prec = 1);
 
 static inline Expr* make_literal (Parser& parser, Token t) {
     Expr* e = arena_new<Expr>(parser.arena);
-    e->kind = LITERAL_EXPR,
+    e->kind = LITERAL_EXPR;
     e->token = t;
     e->type = t.literal.type;
     e->left = nullptr;
@@ -118,7 +118,7 @@ static inline Expr* make_literal (Parser& parser, Token t) {
 
 static inline Expr* make_variable (Parser& parser, Token t) {
     Expr* e = arena_new<Expr>(parser.arena);
-    e->kind = VARIABLE_EXPR,
+    e->kind = VARIABLE_EXPR;
     e->token = t;
     e->type = INT;
     e->left = nullptr;
@@ -129,7 +129,7 @@ static inline Expr* make_variable (Parser& parser, Token t) {
 
 static inline Expr* make_binary (Parser& parser, Token op_token, BinaryOperatorKind op, Expr* left, Expr* right) {
     Expr* e = arena_new<Expr>(parser.arena);
-    e->kind = BINARY_EXPR,
+    e->kind = BINARY_EXPR;
     e->token = op_token;
     e->bin_op = op;
     e->type = INT;
@@ -140,8 +140,9 @@ static inline Expr* make_binary (Parser& parser, Token op_token, BinaryOperatorK
 }
 
 static inline Expr* make_unary (Parser& parser, Token op_token, Expr* inner) {
+
     Expr* e = arena_new<Expr>(parser.arena);
-    e->kind = UNARY_EXPR,
+    e->kind = UNARY_EXPR;
     e->token = op_token;
     e->un_op = get_un_op_kind(op_token.type).value();
 
@@ -176,7 +177,13 @@ static inline Expr* parse_unary(Parser& parser) {
     switch (peek(parser).type) {
 
     case MINUS:
-    case BANG: return make_unary(parser, advance(parser), parse_expr(parser));
+    case BANG:
+        {
+            Token op_token = advance(parser);
+            Expr* inner = parse_unary(parser);
+            return make_unary(parser, op_token, inner);
+        }
+    case LEFT_PAREN:
     case IDENTIFIER:
     case NUMBER:
     case FALSE:
@@ -394,6 +401,8 @@ std::vector<Stmt*> parse_program(Parser& p, std::vector<ParseError> errors) {
 
     while (more(p)) {
         Stmt* s = parse_statement(p);
+
+        std::cout << "pushing statement of kind: " << s->kind << std::endl;
         res.push_back(s);
 
         if (!s)
