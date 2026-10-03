@@ -62,11 +62,22 @@ struct NonRelational {
         case LITERAL_EXPR:
             return V::constant(e.token.literal.value.int_value);
         case VARIABLE_EXPR:
-            return s.env[std::string(e.token.lexeme)];
+            {
+                if (s.env.find(std::string(e.token.lexeme)) == s.env.end()) {
+                    std::cerr << "accessing non initialized variable `" << std::string(e.token.lexeme) << "`" << std::endl;
+                    return V::bottom();
+                }
+
+                return s.env[std::string(e.token.lexeme)];
+            }
         case UNARY_EXPR:
             return V::unary(e, eval(s, *e.left));
         case BINARY_EXPR:
-            return V::binary(e, eval(s, *e.left), eval(s, *e.right));
+            {
+                V eval_left = eval(s, *e.left);
+                V eval_right = eval(s, *e.right);
+                return V::binary(e, eval_left, eval_right);
+            }
         default:
             return V::top();
         }
