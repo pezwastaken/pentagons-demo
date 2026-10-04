@@ -38,7 +38,9 @@ concept ValueDomain = requires (V a, V b, isize n, const Expr& unary, const Expr
     { V::constant(n) } -> std::same_as<V>;
     { V::unary(unary, a) } -> std::same_as<V>;
     { V::binary(binary, a, b) } -> std::same_as<V>;
+    { V::satisfies(binary, a, b) } -> std::same_as<Satisfiability>;
     { V::join(a, b) } -> std::same_as<V>;
+    { V::meet(a, b) } -> std::same_as<V>;
     { V::widen(a, b) } -> std::same_as<V>;
     { V::dump_value(a) } -> std::same_as<std::string>;
     { V::is_bottom(a) } -> std::same_as<bool>;
@@ -257,8 +259,44 @@ struct Interval {
         return top();
     }
 
+    static Satisfiability satisfies(const Expr& binary, Interval a, Interval b) {
+        switch (binary.bin_op) {
+
+        case OP_BINARY_EQ:
+            return interval_eq(a, b);
+        case OP_BINARY_NE:
+            return interval_ne(a, b);
+        case OP_BINARY_LT:
+            return Satisfiability::SAT_UNKNOWN; // TODO
+        case OP_BINARY_LE:
+            return interval_le(a, b);
+        case OP_BINARY_GT:
+        case OP_BINARY_GE:
+        default:
+            return Satisfiability::SAT_UNKNOWN;
+        }
+    }
+
+
     static Interval join(Interval a, Interval b) {
         return top();
+    }
+
+    static Interval meet(Interval a, Interval b) {
+        if (a.kind == BOT || b.kind == BOT)
+            return Interval {.kind = SOME};
+
+        if (a.kind == TOP)
+            return b;
+        if (b.kind == TOP)
+            return a;
+
+        isize l = std::max(a.low, b.low);
+        isize h = std::min(a.high, b.high);
+        if (l > h)
+            return bottom();
+
+        return Interval {.kind = SOME, .low = l, .high = h};
     }
 
     static Interval widen(Interval a, Interval b) {
@@ -320,6 +358,56 @@ private:
         if (a.kind == TOP || a.kind == BOT)
             return a;
         return Interval {.kind = SOME, .low = -a.high, .high = -a.low };
+    }
+
+    static Satisfiability interval_eq(Interval a, Interval b) {
+        if (is_bottom(a) || is_bottom(b))
+            return Satisfiability::SAT_BOT;
+
+        Interval glb = meet(a, b);
+        if (is_bottom(glb))
+            return Satisfiability::SAT_UNSAT;
+        if (is_top(glb))
+            return Satisfiability::SAT_UNKNOWN;
+        if (equal_check(glb, b))
+            return Satisfiability::SAT_SAT;
+
+        return Satisfiability::SAT_UNKNOWN;
+    }
+
+    static Satisfiability interval_ne(Interval a, Interval b) {
+        if (is_bottom(a) || is_bottom(b))
+            return Satisfiability::SAT_BOT;
+
+        Interval glb = meet(a, b);
+        if (is_bottom(glb))
+            return Satisfiability::SAT_SAT;
+        if (is_top(glb))
+            return Satisfiability::SAT_UNKNOWN;
+        if (equal_check(glb, b))
+            return Satisfiability::SAT_UNSAT;
+
+        return Satisfiability::SAT_UNKNOWN;
+    }
+
+    static Satisfiability interval_le(Interval a, Interval b) {
+        if (is_bottom(a) || is_bottom(b))
+            return Satisfiability::SAT_BOT;
+
+        Interval glb = meet(a, b);
+        if (is_bottom(glb))
+            return Satisfiability::SAT_UNSAT;
+        if (is_top(glb))
+            return Satisfiability::SAT_UNKNOWN;
+
+        if (equal_check(glb, b))
+            return Satisfiability::SAT_SAT;
+
+        return Satisfiability::SAT_UNKNOWN;
+    }
+
+    static bool equal_check(Interval a, Interval b) {
+        return a.low == b.low && a.high == b.high;
     }
 
 };
