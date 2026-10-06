@@ -31,7 +31,8 @@ enum Satisfiability {
 
 
 template <class V>
-concept ValueDomain = requires (V a, V b, isize n, const Expr& unary, const Expr& binary) {
+concept ValueDomain = requires (V a, V b, isize n, const Expr& unary, const Expr& binary,
+                                BinaryOperatorKind op) {
 
     { V::bottom() } -> std::same_as<V>;
     { V::top() } -> std::same_as<V>;
@@ -46,6 +47,7 @@ concept ValueDomain = requires (V a, V b, isize n, const Expr& unary, const Expr
     { V::is_bottom(a) } -> std::same_as<bool>;
     { V::is_top(a) } -> std::same_as<bool>;
     { V::leq(a, b) } -> std::same_as<bool>;
+    { V::filter(op, a, b) } -> std::same_as<V>;
 };
 
 
@@ -99,6 +101,33 @@ struct NonRelational {
             return bot_state();
         }
 
+    }
+
+    static State set(State s, const std::string& name, V value) {
+        s.kind = SOME;
+        s.env[name] = value;
+        return s;
+    }
+
+    static State assume(State s, const Expr& e) {
+
+        if (e.kind != BINARY_EXPR)
+            return bot_state();
+
+        return inner_assume(s, e);
+    }
+
+    static State inner_assume(State s, const Expr& e) {
+
+        if (e.left->kind == VARIABLE_EXPR) {
+            V left_value = eval(s, *e.left);
+            V right_value = eval(s, *e.right);
+
+            return set(s, std::string(e.left->token.lexeme),
+                V::filter(e.bin_op, left_value, right_value));
+        }
+
+        return s;
     }
 
     static State top_state() {
@@ -201,7 +230,7 @@ concept StateDomain = requires(D::State s, const std::string& x, const Expr& e) 
     // { D::eval(s, e) } -> std::same_as<typename D::State>;
     // TODO: this should return a tuple <abstract value, abstract state> (function calls with side effects)
 
-    // { D::assume(s, e) } -> std::same_as<typename D::State>;
+    { D::assume(s, e) } -> std::same_as<typename D::State>;
     // { D::widen(s, s) } -> std::same_as<typename D::State>;
 
 };
@@ -313,6 +342,34 @@ struct Interval {
 
     static bool leq(Interval a, Interval b) {
         return (a.low >= b.low && a.high <= b.high);
+    }
+
+    static Interval filter(BinaryOperatorKind op, Interval a, Interval b) {
+        switch (op) {
+        case OP_BINARY_EQ:
+            {
+                if (b.kind == TOP)
+                    return top();
+                Interval glb = Interval::meet(a, b);
+                return glb;
+            }
+        case OP_BINARY_NE:
+            {
+                if (b.kind == TOP)
+                    return top();
+                Interval glb = Interval::meet(a, b);
+                if (Interval::equal_check(a, glb))
+                    return bottom();
+                return a;
+            }
+        case OP_BINARY_LT:
+        case OP_BINARY_LE:
+        case OP_BINARY_GT:
+        case OP_BINARY_GE:
+        case OP_BINARY_LOG_AND:
+        case OP_BINARY_LOG_OR:
+        default: return a;
+        }
     }
 
     static std::string dump_value(Interval a) {

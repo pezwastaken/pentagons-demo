@@ -41,6 +41,17 @@ typename D::State transfer_assign(typename D::State& entry_state, Node* n) {
     return out;
 }
 
+template <StateDomain D>
+typename D::State transfer_assume(typename D::State& entry_state, Node* n) {
+
+    assert(n->stmt.kind == CFG_EXPR_GUARD);
+    assert(n->true_edge);
+
+    typename D::State out = D::assume(entry_state, *n->stmt.expr);
+    assert(!out.env.empty());
+    return out;
+}
+
 
 template <StateDomain D>
 typename D::State transfer(typename D::State entry_state, Node* n) {
@@ -50,6 +61,9 @@ typename D::State transfer(typename D::State entry_state, Node* n) {
         return transfer_declaration<D>(entry_state, n);
     case CFG_ASSIGNMENT:
         return transfer_assign<D>(entry_state, n);
+    case CFG_EXPR_GUARD:
+        return transfer_assume<D>(entry_state, n);
+        // TODO
     case CFG_EXPR:
         // TODO
     case CFG_NOP:
@@ -83,6 +97,7 @@ void fixpoint_analyze(const CFG& cfg) {
 
         const S& entry_state = node_states[x->id];
 
+        // if (x->stmt.kind)
         S out_state = transfer<D>(entry_state, x);
 
         if (x->true_edge != nullptr) {

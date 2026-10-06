@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdio>
+#include <map>
 #include <string>
 #include <format>
 #include "cfg.hh"
@@ -76,6 +77,9 @@ bool html_dump_fixpoint(const CFG& cfg, const FixpointResult<D>& res) {
 
     fputs("<div class=\"sidebar\">\n", f);
     bool is_first = true;
+
+    // TODO: print the nodes in order
+
     for (const auto& [id, S] : res.node_states) {
         std::string b = std::format(
             "  <button onclick=\"showSection('section{}')\" id=\"btn-section{}\" class=\"{}\">node {}</button>\n",

@@ -100,7 +100,7 @@ inline ConstructionResult make_if(Stmt& s) {
     assert(s.kind == IF_STMT);
 
     Node* node = new Node;
-    node->stmt.kind = CFG_EXPR;
+    node->stmt.kind = CFG_EXPR_GUARD;
     node->stmt.expr = s.as.if_stmt.guard;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
@@ -141,7 +141,7 @@ inline ConstructionResult make_while(Stmt& s) {
     assert(s.kind == WHILE_STMT);
 
     Node* node = new Node;
-    node->stmt.kind = CFG_EXPR;
+    node->stmt.kind = CFG_EXPR_GUARD;
     node->stmt.expr = s.as.while_stmt.guard;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
@@ -211,6 +211,7 @@ static std::string label(const CFGStmt& s, usize id) {
             return "[" + std::to_string(id) + "]" + "decl " + std::string(s.name.lexeme) + (s.rhs ? " = " + dump_expr(*s.rhs) : std::string());
         case CFG_ASSIGNMENT:
             return "[" + std::to_string(id) + "]" + dump_expr(*s.lhs) + " = " + dump_expr(*s.rhs);
+        case CFG_EXPR_GUARD:
         case CFG_EXPR:
             return "[" + std::to_string(id) + "]" + dump_expr(*s.expr);
         case CFG_RETURN:
