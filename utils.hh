@@ -4,7 +4,7 @@
 #include <fstream>
 #include <sstream>
 
-#define TODO (exit(1))
+#define TODO (assert(false))
 #define UNREACHABLE (assert(false))
 
 #define OUT

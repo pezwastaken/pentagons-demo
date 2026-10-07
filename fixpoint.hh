@@ -1,7 +1,5 @@
 #pragma once
 
-#include "environment.hh"
-#include <iostream>
 #include <deque>
 #include <unordered_map>
 
@@ -41,12 +39,9 @@ typename D::State transfer_assign(typename D::State& entry_state, Node* n) {
 }
 
 template <StateDomain D>
-typename D::State transfer_assume(typename D::State& entry_state, Node* n) {
+typename D::State transfer_assume(typename D::State& entry_state, const Expr& e) {
 
-    assert(n->stmt.kind == CFG_EXPR_GUARD);
-    assert(n->true_edge);
-
-    typename D::State out = D::assume(entry_state, *n->stmt.expr);
+    typename D::State out = D::assume(entry_state, e);
 #ifndef NDEBUG
     if (!D::is_bottom(out)) {
         assert(!out.env.empty());
@@ -54,7 +49,6 @@ typename D::State transfer_assume(typename D::State& entry_state, Node* n) {
 #endif
     return out;
 }
-
 
 template <StateDomain D>
 typename D::State transfer(typename D::State entry_state, Node* n) {
@@ -65,8 +59,7 @@ typename D::State transfer(typename D::State entry_state, Node* n) {
     case CFG_ASSIGNMENT:
         return transfer_assign<D>(entry_state, n);
     case CFG_EXPR_GUARD:
-        return transfer_assume<D>(entry_state, n);
-        // TODO
+        UNREACHABLE;
     case CFG_EXPR:
         // TODO
     case CFG_NOP:
@@ -76,6 +69,28 @@ typename D::State transfer(typename D::State entry_state, Node* n) {
     }
 
     return D::top_state();
+}
+
+template <StateDomain D>
+struct SplitState {
+    D::State true_state;
+    D::State false_state;
+};
+
+template <StateDomain D>
+SplitState<D> transfer_split(typename D::State entry_state, Node* n) {
+    assert(n->stmt.kind == CFG_EXPR_GUARD);
+
+    assert(n->true_edge);
+    assert(n->false_edge);
+
+    assert(n->stmt.lhs);
+    assert(n->stmt.rhs);
+
+    typename D::State true_state = transfer_assume<D>(entry_state, *n->stmt.lhs);
+    typename D::State false_state = transfer_assume<D>(entry_state, *n->stmt.rhs);
+
+    return SplitState<D> {.true_state = true_state, .false_state = false_state};
 }
 
 template <StateDomain D>
@@ -98,33 +113,58 @@ FixpointResult<D> fixpoint_analyze(const CFG& cfg) {
 
         const S& entry_state = node_states[x];
 
-        S out_state = transfer<D>(entry_state, x);
+        if (x->stmt.kind != CFG_EXPR_GUARD) {
 
-        if (x->true_edge != nullptr) {
-            Node* dest = x->true_edge;
-            usize dest_id = dest->id;
+            S out_state = transfer<D>(entry_state, x);
 
-            S prev = node_states[dest];
+            if (x->true_edge != nullptr) {
 
-            S joined = D::join(out_state, prev);
+                Node* dest = x->true_edge;
+                usize dest_id = dest->id;
 
-            if (!D::leq(joined, prev)) {
-                node_states[dest] = joined;
-                que.push_back(dest);
+                S prev = node_states[dest];
+
+                S joined = D::join(out_state, prev);
+
+                if (!D::leq(joined, prev)) {
+                    node_states[dest] = joined;
+                    que.push_back(dest);
+                }
             }
         }
+        else {
 
-        if (x->false_edge != nullptr) {
-            Node* dest = x->false_edge;
-            usize dest_id = dest->id;
+            SplitState<D> split_state = transfer_split<D>(entry_state, x);
 
-            S prev = node_states[dest];
+            // state transfer along the true edge
+            if (x->true_edge != nullptr) {
 
-            S joined = D::join(out_state, prev);
+                Node* dest = x->true_edge;
+                usize dest_id = dest->id;
 
-            if (!D::leq(joined, prev)) {
-                node_states[dest] = joined;
-                que.push_back(dest);
+                S prev = node_states[dest];
+
+                S joined = D::join(split_state.true_state, prev);
+
+                if (!D::leq(joined, prev)) {
+                    node_states[dest] = joined;
+                    que.push_back(dest);
+                }
+            }
+
+            // state transfer along the false edge
+            if (x->false_edge != nullptr) {
+                Node* dest = x->false_edge;
+                usize dest_id = dest->id;
+
+                S prev = node_states[dest];
+
+                S joined = D::join(split_state.false_state, prev);
+
+                if (!D::leq(joined, prev)) {
+                    node_states[dest] = joined;
+                    que.push_back(dest);
+                }
             }
         }
     }

@@ -1,14 +1,19 @@
-#include "cfg.hh"
 #include "parser.hh"
-#include <iostream>
 #include <unordered_set>
 
+static Arena* mem_arena = nullptr;
 static u32 id_tracker = 0U;
 
 struct ConstructionResult {
     Node* root;
     Node* out;
 };
+
+void cfg_set_arena(Arena *arena) {
+    mem_arena = arena;
+}
+
+static Expr* expr_negate(const Expr& e);
 
 Node* inner_get_cfg(std::vector<Stmt*>& program);
 
@@ -91,6 +96,36 @@ inline ConstructionResult make_block_node(Stmt& s) {
     return r;
 }
 
+static Expr* expr_negate(const Expr& e) {
+    assert(mem_arena);
+    assert(e.kind == BINARY_EXPR); // TODO: could be unary too but whatever
+
+    Expr* negated = arena_new<Expr>(mem_arena);
+    negated->kind = BINARY_EXPR;
+    negated->token = e.token;
+    negated->type = INT;
+    negated->left = e.left;
+    negated->right = e.right;
+
+    switch (e.bin_op) {
+    case OP_BINARY_EQ:
+        negated->bin_op = OP_BINARY_NE; break;
+    case OP_BINARY_NE:
+        negated->bin_op = OP_BINARY_EQ; break;
+    case OP_BINARY_LT:
+        negated->bin_op = OP_BINARY_GE; break;
+    case OP_BINARY_LE:
+        negated->bin_op = OP_BINARY_GT; break;
+    case OP_BINARY_GT:
+        negated->bin_op = OP_BINARY_LE; break;
+    case OP_BINARY_GE:
+        negated->bin_op = OP_BINARY_LT; break;
+    default:
+        TODO;
+    }
+
+    return negated;
+}
 
 inline ConstructionResult make_if(Stmt& s) {
 
@@ -99,6 +134,8 @@ inline ConstructionResult make_if(Stmt& s) {
     Node* node = new Node;
     node->stmt.kind = CFG_EXPR_GUARD;
     node->stmt.expr = s.as.if_stmt.guard;
+    node->stmt.lhs = s.as.if_stmt.guard;
+    node->stmt.rhs = expr_negate(*s.as.if_stmt.guard);
     node->true_edge = nullptr;
     node->false_edge = nullptr;
     node->id = id_tracker;
@@ -253,5 +290,53 @@ bool write_cfg_dot(CFG cfg, const char* path) {
 }
 
 
+std::string cfg_dump_as_text(CFG cfg) {
+
+    const Node* entry = cfg.root;
+
+    std::unordered_set<const Node*> seen;
+    std::vector<const Node*> todo{entry};
+
+    std::string res = "";
+
+    // TODO: if done recursively by entering in the true edges and stuff like that,
+    // can even easily track the indentation and print it nicely
+
+    while (!todo.empty()) {
+        const Node* n = todo.back();
+        todo.pop_back();
+        if (!n || !seen.insert(n).second) continue;
+
+        res += "[ " + std::to_string(n->id) + " ]    ";
+
+        switch (n->stmt.kind) {
+        case CFG_DECLARATION:
+            res += std::string(n->stmt.name.lexeme) + " = " + dump_expr(*n->stmt.rhs) ;
+            break;
+        case CFG_ASSIGNMENT:
+            res += dump_expr(*n->stmt.lhs) + " = " + dump_expr(*n->stmt.rhs) ;
+            break;
+        case CFG_EXPR:
+            res += dump_expr(*n->stmt.expr);
+            break;
+        case CFG_EXPR_GUARD:
+            res += dump_expr(*n->stmt.expr);
+            break;
+        case CFG_RETURN:
+            res += "return " + dump_expr(*n->stmt.expr);
+            break;
+        case CFG_NOP:
+            res += "NOP";
+              break;
+        }
+
+        res += "\n";
+
+        todo.push_back(n->false_edge);
+        todo.push_back(n->true_edge);
+    }
+
+    return res;
+}
 
 

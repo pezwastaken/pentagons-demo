@@ -16,8 +16,8 @@ enum CFGStmtKind {
 struct CFGStmt {
 
     Token name; // declaration
-    Expr* lhs; // assignments
-    Expr* rhs; // assignments/declarations
+    Expr* lhs; // assignments   / true edge of guard
+    Expr* rhs; // assignments/declarations  / false edge of guard
 
     Expr* expr; // expressions and guards
 
@@ -44,8 +44,12 @@ struct CFG {
     Node* root;
 };
 
+
+void cfg_set_arena(Arena* arena);
+
 CFG get_cfg(std::vector<Stmt*>& program);
 
-void debug_cfg(CFG cfg);
-
 bool write_cfg_dot(CFG cfg, const char* path);
+
+std::string dump_cfg_as_text(CFG cfg);
+
