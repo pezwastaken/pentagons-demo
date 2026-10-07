@@ -78,8 +78,6 @@ inline ConstructionResult make_nop() {
 
 inline ConstructionResult make_block_node(Stmt& s) {
 
-    std::cout << "making block" << std::endl;
-
     assert(s.kind == BLOCK_STMT);
 
     Node* root = inner_get_cfg(s.as.block.stmts);
@@ -96,7 +94,6 @@ inline ConstructionResult make_block_node(Stmt& s) {
 
 inline ConstructionResult make_if(Stmt& s) {
 
-    std::cout << "making if" << std::endl;
     assert(s.kind == IF_STMT);
 
     Node* node = new Node;

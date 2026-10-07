@@ -88,8 +88,6 @@ struct NonRelational {
     static State assign(State s, const std::string& name, const Expr& e) {
         V value = eval(s, e);
 
-        std::cout << "eval during assign: " << V::dump_value(value) << std::endl;
-
         if (!V::is_bottom(value)) {
             s.kind = SOME;
             s.env[name] = value;
@@ -121,8 +119,12 @@ struct NonRelational {
             V left_value = eval(s, *e.left);
             V right_value = eval(s, *e.right);
 
-            return set(s, std::string(e.left->token.lexeme),
-                V::filter(e.bin_op, left_value, right_value));
+            V filtered = V::filter(e.bin_op, left_value, right_value);
+            if (V::is_bottom(filtered)) {
+                return bot_state();
+            }
+
+            return set(s, std::string(e.left->token.lexeme), filtered);
         }
 
         return s;
@@ -133,7 +135,7 @@ struct NonRelational {
     }
 
     static State bot_state() {
-        return State {.kind = BOT, .env = {}, .reachable = true};
+        return State {.kind = BOT, .env = {}, .reachable = false};
     }
 
     static std::string dump_state(const State& s) {
@@ -210,6 +212,10 @@ struct NonRelational {
         return true;
     }
 
+    static bool is_reachable(const State& s) {
+        return s.reachable;
+    }
+
 };
 
 
@@ -224,6 +230,8 @@ concept StateDomain = requires(D::State s, const std::string& x, const Expr& e) 
     { D::is_top(s) } -> std::same_as<bool>;
     { D::join(s, s) } -> std::same_as<typename D::State>;
     { D::leq(s, s) } -> std::same_as<bool>;
+
+    { D::is_reachable(s) } -> std::same_as<bool>;
 
     // { D::eval(s, e) } -> std::same_as<typename D::State>;
     // TODO: this should return a tuple <abstract value, abstract state> (function calls with side effects)
@@ -249,7 +257,6 @@ struct Interval {
     }
 
     static Interval constant(isize n) {
-        std::cout << "constant with value " << n << std::endl;
         return Interval {.kind = SOME, .low = n, .high = n};
     }
 
@@ -306,7 +313,16 @@ struct Interval {
 
 
     static Interval join(Interval a, Interval b) {
-        return top();
+        if (a.kind == TOP || b.kind == TOP)
+            return top();
+
+        if (a.kind == BOT)
+            return b;
+        if (b.kind == BOT)
+            return a;
+
+        return Interval {.kind = SOME, .low = std::min(a.low, b.low),
+            .high = std::max(a.high, b.high)};
     }
 
     static Interval meet(Interval a, Interval b) {
@@ -474,7 +490,7 @@ static_assert(StateDomain<NonRelational<Interval>>);
 
 template <StateDomain D>
 struct FixpointResult {
-    std::unordered_map<usize, typename D::State> node_states;
+    std::unordered_map<Node*, typename D::State> node_states;
 };
 
 

@@ -39,7 +39,9 @@ int main() {
 
     bool done = write_cfg_dot(cfg, "out.dot");
 
-    fixpoint_analyze<NonRelational<Interval>>(cfg);
+    auto fixpoint_result = fixpoint_analyze<NonRelational<Interval>>(cfg);
+
+    html_dump_fixpoint(cfg, fixpoint_result);
 
     arena_destroy(p.arena);
 

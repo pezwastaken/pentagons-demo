@@ -399,12 +399,7 @@ std::vector<Stmt*> parse_program(Parser& p, std::vector<ParseError> errors) {
     while (more(p)) {
         Stmt* s = parse_statement(p);
 
-        std::cout << "pushing statement of kind: " << s->kind << std::endl;
         res.push_back(s);
-
-        if (!s)
-            std::cout << "pushed a null statement" << std::endl;
-        std::cout << std::endl;
     }
 
     return res;

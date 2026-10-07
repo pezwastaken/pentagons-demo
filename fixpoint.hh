@@ -1,7 +1,9 @@
 #pragma once
 
+#include "environment.hh"
 #include <iostream>
 #include <deque>
+#include <unordered_map>
 
 template <StateDomain D>
 typename D::State transfer_declaration(typename D::State& entry_state, Node* n) {
@@ -45,7 +47,11 @@ typename D::State transfer_assume(typename D::State& entry_state, Node* n) {
     assert(n->true_edge);
 
     typename D::State out = D::assume(entry_state, *n->stmt.expr);
-    assert(!out.env.empty());
+#ifndef NDEBUG
+    if (!D::is_bottom(out)) {
+        assert(!out.env.empty());
+    }
+#endif
     return out;
 }
 
@@ -73,14 +79,12 @@ typename D::State transfer(typename D::State entry_state, Node* n) {
 }
 
 template <StateDomain D>
-void fixpoint_analyze(const CFG& cfg) {
+FixpointResult<D> fixpoint_analyze(const CFG& cfg) {
 
     using S = typename D::State;
 
-    std::unordered_map<usize, S> node_states;
-
-    auto entry_state = D::bot_state();
-    node_states[0U] = entry_state;
+    FixpointResult<D> result;
+    std::unordered_map<Node*, S>& node_states = result.node_states;
 
     Node* root = cfg.root;
 
@@ -92,37 +96,45 @@ void fixpoint_analyze(const CFG& cfg) {
         Node* x = que.front();
         que.pop_front();
 
-        const S& entry_state = node_states[x->id];
+        const S& entry_state = node_states[x];
 
-        // if (x->stmt.kind)
         S out_state = transfer<D>(entry_state, x);
 
         if (x->true_edge != nullptr) {
             Node* dest = x->true_edge;
             usize dest_id = dest->id;
 
-            S prev = node_states[dest_id];
+            S prev = node_states[dest];
 
             S joined = D::join(out_state, prev);
 
             if (!D::leq(joined, prev)) {
+                node_states[dest] = joined;
+                que.push_back(dest);
+            }
+        }
 
-                // std::cout << "dumping state after join (worklist) for node " <<
-                //     dest_id << D::dump_state(joined) << std::endl;
-                //
-                node_states[dest_id] = joined;
+        if (x->false_edge != nullptr) {
+            Node* dest = x->false_edge;
+            usize dest_id = dest->id;
 
+            S prev = node_states[dest];
+
+            S joined = D::join(out_state, prev);
+
+            if (!D::leq(joined, prev)) {
+                node_states[dest] = joined;
                 que.push_back(dest);
             }
         }
     }
 
-    for (const auto& [id, state] : node_states) {
-        std::cout << "state for node id: " << id << D::dump_state(node_states[id])
-            << std::endl;
-    }
+    // for (const auto& [id, state] : node_states) {
+    //     std::cout << "state for node id: " << id << D::dump_state(node_states[id])
+    //         << std::endl;
+    // }
 
-    html_dump_fixpoint(cfg, FixpointResult<D> {node_states});
+    return result;
 }
 
 
