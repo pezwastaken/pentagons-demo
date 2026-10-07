@@ -4,8 +4,6 @@
 #include <climits>
 #include <iostream>
 #include <unordered_map>
-#include "parser.hh"
-#include "utils.hh"
 
 #define CHECK_TOP_BOT \
 if (a.kind == TOP || b.kind == TOP) \

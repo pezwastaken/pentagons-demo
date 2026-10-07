@@ -4,8 +4,6 @@
 #include <map>
 #include <string>
 #include <format>
-#include "cfg.hh"
-#include "environment.hh"
 
 template <StateDomain D>
 bool html_dump_fixpoint(const CFG& cfg, const FixpointResult<D>& res) {

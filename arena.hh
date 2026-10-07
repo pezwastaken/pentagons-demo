@@ -1,6 +1,5 @@
 #pragma once
 
-#include "utils.hh"
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>

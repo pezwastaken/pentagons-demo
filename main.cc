@@ -1,9 +1,9 @@
+#include "core_inc.hh"
+#include "core_inc.cc"
+
 #include <iostream>
 #include <string>
-#include "arena.hh"
-#include "cfg.hh"
-#include "environment.hh"
-#include "fixpoint.hh"
+
 
 int main() {
 

@@ -2,7 +2,6 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
-#include "lexer.hh"
 
 static std::unordered_map<std::string, TokenType> keywords;
 

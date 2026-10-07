@@ -1,7 +1,5 @@
 #pragma once
 
-#include "parser.hh"
-
 struct SyntheticPP {
     u32 line;
 };
