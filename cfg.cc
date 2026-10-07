@@ -133,8 +133,6 @@ inline ConstructionResult make_if(Stmt& s) {
 
 inline ConstructionResult make_while(Stmt& s) {
 
-    std::cout << "making while cfg" << std::endl;
-
     assert(s.kind == WHILE_STMT);
 
     Node* node = new Node;
