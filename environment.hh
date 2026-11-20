@@ -1,5 +1,6 @@
 #pragma once
 
+#include "parser.hh"
 #include <algorithm>
 #include <climits>
 #include <iostream>
@@ -37,6 +38,7 @@ concept ValueDomain = requires (V a, V b, isize n, const Expr& unary, const Expr
     { V::constant(n) } -> std::same_as<V>;
     { V::unary(unary, a) } -> std::same_as<V>;
     { V::binary(binary, a, b) } -> std::same_as<V>;
+    { V::input_with_bounds(a, b) } -> std::same_as<V>;
     { V::satisfies(binary, a, b) } -> std::same_as<Satisfiability>;
     { V::join(a, b) } -> std::same_as<V>;
     { V::meet(a, b) } -> std::same_as<V>;
@@ -79,6 +81,12 @@ struct NonRelational {
                 V eval_left = eval(s, *e.left);
                 V eval_right = eval(s, *e.right);
                 return V::binary(e, eval_left, eval_right);
+            }
+        case INPUT_EXPR:
+            {
+                V eval_left = eval(s, *e.left);
+                V eval_right = eval(s, *e.right);
+                return V::input_with_bounds(eval_left, eval_right);
             }
         default:
             return V::top();
@@ -290,6 +298,12 @@ struct Interval {
         }
 
         return top();
+    }
+
+    static Interval input_with_bounds(Interval a, Interval b) {
+        // assuming they are always constants, this breaks otherwise
+        assert (a.low <= b.low);
+        return Interval {.kind = SOME, .low = a.low, .high = b.high};
     }
 
     static Satisfiability satisfies(const Expr& binary, Interval a, Interval b) {
