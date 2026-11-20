@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-PRELUDE = ROOT / "all_headers.hh"
+PRELUDE = ROOT / "core_inc.hh"
 ENTRY = ROOT / "main.cc"
 EXTS = {".cc", ".hh"}
 SKIP_DIRS = {".git", ".cache", "build"}
