@@ -10,6 +10,7 @@ enum CFGStmtKind {
     CFG_EXPR,
     CFG_EXPR_GUARD,
     CFG_RETURN,
+    CFG_ASSERT,
     CFG_NOP,
 };
 
@@ -48,6 +49,8 @@ struct CFG {
 void cfg_set_arena(Arena* arena);
 
 CFG get_cfg(std::vector<Stmt*>& program);
+
+Expr* expr_negate(const Expr& e);
 
 bool write_cfg_dot(CFG cfg, const char* path);
 

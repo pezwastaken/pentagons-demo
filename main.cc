@@ -47,6 +47,26 @@ int main() {
 
     auto fixpoint_result = fixpoint_analyze<NonRelational<Interval>>(cfg);
 
+    std::cout << "have results for " << fixpoint_result.asserts_sat.size() << " asserts" << std::endl;
+
+    for (const auto& [node, sat] : fixpoint_result.asserts_sat) {
+
+        switch (sat) {
+        case SAT_UNKNOWN:
+            std::cerr << "assert at line: " << node->pp.line << " MAY not hold" << std::endl;
+            break;
+        case SAT_SAT:
+            std::cerr << "assert at line: " << node->pp.line << " ALWAYS holds" << std::endl;
+            break;
+        case SAT_UNSAT:
+            std::cerr << "assert at line: " << node->pp.line << " NEVER holds" << std::endl;
+            break;
+        case SAT_BOT:
+            std::cerr << "assert at line: " << node->pp.line << " has bottom state" << std::endl;
+            break;
+        }
+    }
+
     html_dump_fixpoint(cfg, fixpoint_result);
 
     arena_destroy(p.arena);

@@ -1,8 +1,5 @@
-int a = -5 * 4;
-int b = -a;
+int x = 0;
 
-if (a == 10) {
-	int c = 1;
-}
+assert (x == 0);
 
-return 0;
+return 5;

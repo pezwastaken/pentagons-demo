@@ -218,7 +218,6 @@ struct NonRelational {
 
 };
 
-
 template <class D>
 concept StateDomain = requires(D::State s, const std::string& x, const Expr& e) {
 
@@ -491,6 +490,7 @@ static_assert(StateDomain<NonRelational<Interval>>);
 template <StateDomain D>
 struct FixpointResult {
     std::unordered_map<Node*, typename D::State> node_states;
+    std::unordered_map<Node*, Satisfiability> asserts_sat;
 };
 
 

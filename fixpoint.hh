@@ -1,5 +1,6 @@
 #pragma once
 
+#include "environment.hh"
 #include <deque>
 #include <unordered_map>
 
@@ -50,14 +51,52 @@ typename D::State transfer_assume(typename D::State& entry_state, const Expr& e)
     return out;
 }
 
+
+struct TransferInfo {
+    Satisfiability is_assert_sat;
+};
+
 template <StateDomain D>
-typename D::State transfer(typename D::State entry_state, Node* n) {
+typename D::State transfer_assert(typename D::State& entry_state, const Expr& e, TransferInfo& assert_info) {
+
+    auto ok = transfer_assume<D>(entry_state, e);
+    auto bad = transfer_assume<D>(entry_state, *expr_negate(e));
+
+    std::cout << "dumping ok state" << std::endl;
+    D::dump_state(ok);
+    std::cout << "\n\ndumping bad state" << std::endl;
+    D::dump_state(bad);
+    std::cout << "\n\n" << std::endl;
+
+    if (D::is_bottom(bad)) {
+        assert_info.is_assert_sat = SAT_SAT;
+    }
+    else if (D::is_bottom(ok)){
+        assert_info.is_assert_sat = SAT_UNSAT;
+    }
+    else {
+        assert_info.is_assert_sat = SAT_UNKNOWN;
+    }
+
+    return ok;
+}
+
+template <StateDomain D>
+typename D::State transfer(typename D::State entry_state, Node* n, FixpointResult<D>& result) {
+
 
     switch (n->stmt.kind) {
     case CFG_DECLARATION:
         return transfer_declaration<D>(entry_state, n);
     case CFG_ASSIGNMENT:
         return transfer_assign<D>(entry_state, n);
+    case CFG_ASSERT:
+        {
+            TransferInfo t {.is_assert_sat = SAT_UNKNOWN };
+            typename D::State res_state = transfer_assert<D>(entry_state, *n->stmt.expr, t);
+            result.asserts_sat[n] = t.is_assert_sat;
+            return res_state;
+        }
     case CFG_EXPR_GUARD:
         UNREACHABLE;
     case CFG_EXPR:
@@ -115,7 +154,7 @@ FixpointResult<D> fixpoint_analyze(const CFG& cfg) {
 
         if (x->stmt.kind != CFG_EXPR_GUARD) {
 
-            S out_state = transfer<D>(entry_state, x);
+            S out_state = transfer<D>(entry_state, x, result);
 
             if (x->true_edge != nullptr) {
 

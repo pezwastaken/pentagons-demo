@@ -13,8 +13,6 @@ void cfg_set_arena(Arena *arena) {
     mem_arena = arena;
 }
 
-static Expr* expr_negate(const Expr& e);
-
 Node* inner_get_cfg(std::vector<Stmt*>& program);
 
 inline ConstructionResult make_assign_node(Stmt& s) {
@@ -47,6 +45,20 @@ inline ConstructionResult make_decl_node(Stmt& s) {
 inline ConstructionResult make_expr_node(Stmt& s) {
     Node* node = new Node;
     node->stmt.kind = CFG_EXPR;
+    assert(s.as.expr.expr != nullptr);
+    node->stmt.expr = s.as.expr.expr;
+    node->true_edge = nullptr;
+    node->false_edge = nullptr;
+    node->id = id_tracker;
+    node->pp = SyntheticPP {id_tracker++};
+    ConstructionResult r = ConstructionResult {node, node};
+    return r;
+}
+
+inline ConstructionResult make_assert_node(Stmt& s) {
+    std::cout << "CFG: making assert node" << std::endl;
+    Node* node = new Node;
+    node->stmt.kind = CFG_ASSERT;
     assert(s.as.expr.expr != nullptr);
     node->stmt.expr = s.as.expr.expr;
     node->true_edge = nullptr;
@@ -96,7 +108,7 @@ inline ConstructionResult make_block_node(Stmt& s) {
     return r;
 }
 
-static Expr* expr_negate(const Expr& e) {
+Expr* expr_negate(const Expr& e) {
     assert(mem_arena);
     assert(e.kind == BINARY_EXPR); // TODO: could be unary too but whatever
 
@@ -208,6 +220,7 @@ Node* inner_get_cfg(std::vector<Stmt*>& program) {
 
         case ASSIGN_STMT: r = make_assign_node(*s); break;
         case EXPR_STMT: r = make_expr_node(*s); break;
+        case ASSERT_STMT: r = make_assert_node(*s); break;
         case DECL_STMT: r = make_decl_node(*s); break;
         case RET_STMT: r = make_ret_node(*s); break;
         case IF_STMT: r = make_if(*s); break;
@@ -295,7 +308,7 @@ std::string cfg_dump_as_text(CFG cfg) {
     const Node* entry = cfg.root;
 
     std::unordered_set<const Node*> seen;
-    std::vector<const Node*> todo{entry};
+    std::vector<const Node*> todo {entry};
 
     std::string res = "";
 

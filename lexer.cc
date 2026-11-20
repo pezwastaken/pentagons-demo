@@ -23,6 +23,8 @@ static void populate_keywords() {
     keywords["var"] =   VAR;
     keywords["int"] =   INTID;
     keywords["while"] = WHILE;
+    keywords["assert"] = ASSERT;
+    keywords["input"] = INPUT;
 }
 
 

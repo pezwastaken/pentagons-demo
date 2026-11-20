@@ -1,4 +1,4 @@
-#include <iostream>
+#include "parser.hh"
 #include <optional>
 
 struct OpInfo {
@@ -169,18 +169,34 @@ static inline Expr* parse_atom(Parser& parser) {
 
 static inline Expr* parse_unary(Parser& parser) {
 
-    // TODO: parse unary expressions like ! and `-`
-
     switch (peek(parser).type) {
 
     case MINUS:
     case BANG:
         {
             Token op_token = advance(parser);
-            Expr* inner = parse_unary(parser);
+            Expr* inner = parse_expr(parser);
             return make_unary(parser, op_token, inner);
         }
+    case INPUT:
+        TODO;
+        // {
+        //     Token op_token = advance(parser);
+        //     Expr* inner = parse_expr(parser);
+        //     return make_unary(parser, op_token, inner);
+        // }
     case LEFT_PAREN:
+        {
+            std::cout << "parse unary: left paren" << std::endl;
+            Token parens = advance(parser);
+            Expr* inner = parse_expr(parser);
+            Expr* res = make_unary(parser, parens, inner);
+            if (!match(parser, TokenType::RIGHT_PAREN)) {
+                std::cout << "missing right paren" << std::endl;
+            }
+            return res;
+
+        }
     case IDENTIFIER:
     case NUMBER:
     case FALSE:
@@ -314,6 +330,26 @@ static inline Stmt* parse_if(Parser& p) {
     return if_stmt;
 }
 
+static inline Stmt* parse_assert(Parser& p) {
+
+    Token kw = advance(p);
+    assert(kw.type == ASSERT);
+    if (!match(p, LEFT_PAREN)) p.errors.push_back({"expected left paren after assert"});
+
+    Expr* guard = parse_expr(p);
+
+    if (!match(p, RIGHT_PAREN)) p.errors.push_back({"expected right paren after assert expr"});
+
+    Stmt* assert_stmt = arena_new<Stmt>(p.arena);
+    assert_stmt->kind = ASSERT_STMT;
+    assert_stmt->token = kw;
+    assert_stmt->as.expr.expr = guard;
+
+    if (!match(p, SEMICOLON)) return nullptr;
+
+    return assert_stmt;
+}
+
 static inline Stmt* parse_while(Parser& p) {
 
     Token kw = advance(p);
@@ -382,6 +418,8 @@ static inline Stmt* parse_statement(Parser& p) {
             return parse_if(p);
         case WHILE:
             return parse_while(p);
+        case ASSERT:
+            return parse_assert(p);
         case LEFT_BRACE:
             return parse_block(p);
         case RETURN:
@@ -413,6 +451,8 @@ std::string dump_stmt(const Stmt& s) {
         return std::string(s.as.assign.target->token.lexeme) + " = " + (dump_expr(*s.as.assign.expr));
     case EXPR_STMT:
         return (dump_expr(*s.as.expr.expr));
+    case ASSERT_STMT:
+        return ("assert (" + dump_expr(*s.as.expr.expr) + ")");
     case RET_STMT:
         return ("return " + dump_expr(*s.as.ret_stmt.expr));
     case IF_STMT:

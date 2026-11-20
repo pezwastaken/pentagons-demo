@@ -13,6 +13,9 @@ enum ExprKind {
 enum UnaryOperatorKind {
     OP_UNARY_NEG,
     OP_UNARY_LOG_NEG,
+    OP_UNARY_ASSERT,
+    OP_UNARY_INPUT_INT,
+    OP_UNARY_INPUT_STRING,
 };
 
 enum BinaryOperatorKind {
@@ -58,6 +61,7 @@ struct Parser {
 
 enum StmtKind {
     EXPR_STMT,
+    ASSERT_STMT,
     ASSIGN_STMT,
     DECL_STMT,
     RET_STMT,
