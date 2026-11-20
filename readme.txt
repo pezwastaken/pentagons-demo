@@ -1,5 +1,3 @@
-int x = 0;
+int a = input(0, 20);
 
-assert (x == 0);
-
-return 5;
+return 0;

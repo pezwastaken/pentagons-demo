@@ -62,12 +62,6 @@ typename D::State transfer_assert(typename D::State& entry_state, const Expr& e,
     auto ok = transfer_assume<D>(entry_state, e);
     auto bad = transfer_assume<D>(entry_state, *expr_negate(e));
 
-    std::cout << "dumping ok state" << std::endl;
-    D::dump_state(ok);
-    std::cout << "\n\ndumping bad state" << std::endl;
-    D::dump_state(bad);
-    std::cout << "\n\n" << std::endl;
-
     if (D::is_bottom(bad)) {
         assert_info.is_assert_sat = SAT_SAT;
     }

@@ -8,6 +8,8 @@ enum ExprKind {
     VARIABLE_EXPR,
     UNARY_EXPR,
     BINARY_EXPR,
+    FN_CALL,
+    INPUT_EXPR,
 };
 
 enum UnaryOperatorKind {
@@ -44,6 +46,8 @@ struct Expr {
     Expr* left;
     Expr* right;
 
+    // used by function calls, otherwise empty
+    std::vector<Expr*> args;
 };
 
 

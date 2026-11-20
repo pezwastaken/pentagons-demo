@@ -1,4 +1,6 @@
 #include "parser.hh"
+#include "arena.hh"
+#include "lexer.hh"
 #include <optional>
 
 struct OpInfo {
@@ -153,15 +155,46 @@ static inline Expr* make_unary (Parser& parser, Token op_token, Expr* inner) {
     return e;
 }
 
+static inline Expr* parse_input(Parser& parser) {
+
+    Token kw = advance(parser);
+    if (!match(parser, TokenType::LEFT_PAREN)) {
+        parser.errors.push_back({.inner = "expected `(` after `input`"});
+        return nullptr;
+    }
+
+    Expr* left = parse_expr(parser);
+    assert(left != nullptr);
+    if (!match(parser, TokenType::COMMA)) {
+        parser.errors.push_back({.inner = "expected `input(lo, hi)`"});
+        return nullptr;
+    }
+
+    Expr* right = parse_expr(parser);
+    assert(right != nullptr);
+
+    if (!match(parser, TokenType::RIGHT_PAREN)) {
+        parser.errors.push_back({.inner = "expected `)` after `input`"});
+        return nullptr;
+    }
+
+    Expr* e = arena_new<Expr>(parser.arena);
+    e->kind = INPUT_EXPR;
+    e->token = kw;
+    e->type = INT;
+    e->left = left;
+    e->right = right;
+    return e;
+}
+
 static inline Expr* parse_atom(Parser& parser) {
 
     switch (peek(parser).type) {
-
     case NUMBER:
     case FALSE:
     case TRUE: return make_literal(parser, advance(parser));
-    case LEFT_PAREN: UNREACHABLE; // TODO
     case IDENTIFIER: return make_variable(parser, advance(parser));
+    case INPUT: return parse_input(parser);
     default:
         return nullptr;
     }
@@ -178,34 +211,64 @@ static inline Expr* parse_unary(Parser& parser) {
             Expr* inner = parse_expr(parser);
             return make_unary(parser, op_token, inner);
         }
-    case INPUT:
-        TODO;
-        // {
-        //     Token op_token = advance(parser);
-        //     Expr* inner = parse_expr(parser);
-        //     return make_unary(parser, op_token, inner);
-        // }
     case LEFT_PAREN:
         {
-            std::cout << "parse unary: left paren" << std::endl;
             Token parens = advance(parser);
             Expr* inner = parse_expr(parser);
             Expr* res = make_unary(parser, parens, inner);
             if (!match(parser, TokenType::RIGHT_PAREN)) {
+                // TODO:
                 std::cout << "missing right paren" << std::endl;
             }
             return res;
-
         }
     case IDENTIFIER:
     case NUMBER:
     case FALSE:
+    case INPUT:
     case TRUE: return parse_atom(parser);
     default:
         return nullptr;
     }
 
 }
+
+// static inline Expr* parse_function_call(Parser& parser, Expr* fn_identifier) {
+//
+//     Expr* e = arena_new<Expr>(parser.arena);
+//     e->kind = ExprKind::FN_CALL;
+//     e->token = fn_identifier->token;
+//     e->type = INT;
+//
+//     // Expr* args = arena_new_array<Expr>(parser.arena, size_t len)
+//
+//     assert(e->args.size() == 0);
+//
+//     std::cout << "parsing function call: peek: " << peek(parser).lexeme << std::endl;
+//
+//     // populate the args of the func call
+//     while (!match(parser, TokenType::RIGHT_PAREN)) {
+//
+//         std::cout << "parsing function call: peek: " << peek(parser).lexeme << std::endl;
+//
+//         Expr* arg = parse_expr(parser);
+//         e->args.push_back(arg);
+//
+//         if (match(parser, TokenType::RIGHT_PAREN)) {
+//             break;
+//         }
+//         if (!match(parser, TokenType::COMMA)) {
+//             parser.errors.push_back(
+//                 ParseError {.inner = "each argument should be followed by a `,`"}
+//             );
+//             return nullptr;
+//         }
+//     }
+//
+//     std::cout << "parsed function call to identifier: " << e->token.lexeme
+//         << " with " << e->args.size() << " arguments" << std::endl;
+//     return e;
+// }
 
 static inline Expr* parse_expr(Parser& parser, i32 min_prec) {
 
@@ -241,6 +304,8 @@ std::string dump_expr(const Expr& expr) {
     case BINARY_EXPR:
         return " ( " + std::string(expr.token.lexeme) + " " + dump_expr(*expr.left) + ", " +
             dump_expr(*expr.right) + " ) ";
+    case INPUT_EXPR:
+        return " input (" + dump_expr(*expr.left) + ", " + dump_expr(*expr.right) + " ) ";
     default:
         UNREACHABLE;
     }
@@ -276,6 +341,7 @@ static inline Stmt* parse_var_decl(Parser& parser) {
 
 static inline Stmt* parse_assignment_or_expr(Parser& parser) {
 
+
     Expr* lhs = parse_expr(parser);
     Stmt* s = nullptr;
 
@@ -284,6 +350,7 @@ static inline Stmt* parse_assignment_or_expr(Parser& parser) {
             parser.errors.push_back({"assigning a value to an expression that is not an identifier"});
             return nullptr;
         }
+
 
         Expr* init = parse_expr(parser);
 
