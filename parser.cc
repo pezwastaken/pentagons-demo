@@ -1,6 +1,3 @@
-#include "parser.hh"
-#include "arena.hh"
-#include "lexer.hh"
 #include <optional>
 
 struct OpInfo {
@@ -102,92 +99,94 @@ static inline std::optional<Token> expect(Parser& p, TokenType t) {
     return std::nullopt;
 }
 
-static inline Expr* parse_expr(Parser& parser, i32 min_prec = 1);
+static inline ExprId parse_expr(Parser& parser, i32 min_prec = 1);
 
-static inline Expr* make_literal (Parser& parser, Token t) {
-    Expr* e = arena_new<Expr>(parser.arena);
-    e->kind = LITERAL_EXPR;
-    e->token = t;
-    e->type = t.literal.type;
-    e->left = nullptr;
-    e->right = nullptr;
+static inline ExprId make_literal (Parser& parser, Token t) {
+    // Expr* e = arena_new<Expr>(parser.arena);
+    Expr e {};
+    e.kind = LITERAL_EXPR;
+    e.token = t;
+    e.type = t.literal.type;
+    e.left = ExprId();
+    e.right = ExprId();
 
-    return e;
+    return parser.ast.add(e);
 }
 
-static inline Expr* make_variable (Parser& parser, Token t) {
-    Expr* e = arena_new<Expr>(parser.arena);
-    e->kind = VARIABLE_EXPR;
-    e->token = t;
-    e->type = INT;
-    e->left = nullptr;
-    e->right = nullptr;
+static inline ExprId make_variable (Parser& parser, Token t) {
+    Expr e {};
+    e.kind = VARIABLE_EXPR;
+    e.token = t;
+    e.type = INT;
+    e.left = ExprId();
+    e.right = ExprId();
 
-    return e;
+    return parser.ast.add(e);
 }
 
-static inline Expr* make_binary (Parser& parser, Token op_token, BinaryOperatorKind op, Expr* left, Expr* right) {
-    Expr* e = arena_new<Expr>(parser.arena);
-    e->kind = BINARY_EXPR;
-    e->token = op_token;
-    e->bin_op = op;
-    e->type = INT;
-    e->left = left;
-    e->right = right;
+static inline ExprId make_binary (Parser& parser, Token op_token, BinaryOperatorKind op, ExprId left, ExprId right) {
+    Expr e {};
+    e.kind = BINARY_EXPR;
+    e.token = op_token;
+    e.bin_op = op;
+    e.type = INT;
+    e.left = ExprId();
+    e.right = ExprId();
 
-    return e;
+    return parser.ast.add(e);
 }
 
-static inline Expr* make_unary (Parser& parser, Token op_token, Expr* inner) {
+static inline ExprId make_unary (Parser& parser, Token op_token, ExprId inner) {
 
-    Expr* e = arena_new<Expr>(parser.arena);
-    e->kind = UNARY_EXPR;
-    e->token = op_token;
-    e->un_op = get_un_op_kind(op_token.type).value();
+    Expr e {};
+    e.kind = UNARY_EXPR;
+    e.token = op_token;
+    e.un_op = get_un_op_kind(op_token.type).value();
 
     // TODO this should be populated by the typechecker OR
     // could even be done by the parser by simply looking at the operator
     // (- -> int, ! -> bool)
-    e->type = INT;
-    e->left = inner;
-    e->right = nullptr;
+    e.type = INT;
+    e.left = inner;
+    e.right = ExprId();
 
-    return e;
+    return parser.ast.add(e);
 }
 
-static inline Expr* parse_input(Parser& parser) {
+static inline ExprId parse_input(Parser& parser) {
 
     Token kw = advance(parser);
     if (!match(parser, TokenType::LEFT_PAREN)) {
         parser.errors.push_back({.inner = "expected `(` after `input`"});
-        return nullptr;
+        return ExprId {};
     }
 
-    Expr* left = parse_expr(parser);
-    assert(left != nullptr);
+    ExprId left = parse_expr(parser);
+    assert(left.valid());
     if (!match(parser, TokenType::COMMA)) {
         parser.errors.push_back({.inner = "expected `input(lo, hi)`"});
-        return nullptr;
+        return ExprId {};
     }
 
-    Expr* right = parse_expr(parser);
-    assert(right != nullptr);
+    ExprId right = parse_expr(parser);
+    assert(right.valid());
 
     if (!match(parser, TokenType::RIGHT_PAREN)) {
         parser.errors.push_back({.inner = "expected `)` after `input`"});
-        return nullptr;
+        return ExprId {};
     }
 
-    Expr* e = arena_new<Expr>(parser.arena);
-    e->kind = INPUT_EXPR;
-    e->token = kw;
-    e->type = INT;
-    e->left = left;
-    e->right = right;
-    return e;
+    Expr e {};
+    e.kind = INPUT_EXPR;
+    e.token = kw;
+    e.type = INT;
+    e.left = left;
+    e.right = right;
+
+    return parser.ast.add(e);
 }
 
-static inline Expr* parse_atom(Parser& parser) {
+static inline ExprId parse_atom(Parser& parser) {
 
     switch (peek(parser).type) {
     case NUMBER:
@@ -196,11 +195,11 @@ static inline Expr* parse_atom(Parser& parser) {
     case IDENTIFIER: return make_variable(parser, advance(parser));
     case INPUT: return parse_input(parser);
     default:
-        return nullptr;
+        return ExprId{};
     }
 }
 
-static inline Expr* parse_unary(Parser& parser) {
+static inline ExprId parse_unary(Parser& parser) {
 
     switch (peek(parser).type) {
 
@@ -208,14 +207,14 @@ static inline Expr* parse_unary(Parser& parser) {
     case BANG:
         {
             Token op_token = advance(parser);
-            Expr* inner = parse_expr(parser);
+            ExprId inner = parse_expr(parser);
             return make_unary(parser, op_token, inner);
         }
     case LEFT_PAREN:
         {
             Token parens = advance(parser);
-            Expr* inner = parse_expr(parser);
-            Expr* res = make_unary(parser, parens, inner);
+            ExprId inner = parse_expr(parser);
+            ExprId res = make_unary(parser, parens, inner);
             if (!match(parser, TokenType::RIGHT_PAREN)) {
                 // TODO:
                 std::cout << "missing right paren" << std::endl;
@@ -228,7 +227,7 @@ static inline Expr* parse_unary(Parser& parser) {
     case INPUT:
     case TRUE: return parse_atom(parser);
     default:
-        return nullptr;
+        return ExprId {};
     }
 
 }
@@ -270,9 +269,9 @@ static inline Expr* parse_unary(Parser& parser) {
 //     return e;
 // }
 
-static inline Expr* parse_expr(Parser& parser, i32 min_prec) {
+static inline ExprId parse_expr(Parser& parser, i32 min_prec) {
 
-    Expr* left = parse_unary(parser);
+    ExprId left = parse_unary(parser);
 
     while (true) {
         OpInfo info = binary_op_info(peek(parser).type);
@@ -283,7 +282,7 @@ static inline Expr* parse_expr(Parser& parser, i32 min_prec) {
         Token op_token = advance(parser);
 
         int next_min = info.right_assoc ? info.prec : info.prec + 1;
-        Expr* right = parse_expr(parser, next_min);
+        ExprId right = parse_expr(parser, next_min);
 
         BinaryOperatorKind op = get_bin_op_kind(op_token.type).value();
         left = make_binary(parser, op_token, op, left, right);
@@ -293,27 +292,31 @@ static inline Expr* parse_expr(Parser& parser, i32 min_prec) {
 
 }
 
-std::string dump_expr(const Expr& expr) {
+std::string dump_expr(const Ast& ast, ExprId expr_id) {
+
+    assert(expr_id.valid());
+    const Expr& expr = ast[expr_id];
+
     switch (expr.kind) {
     case LITERAL_EXPR:
         return std::string(expr.token.lexeme);
     case VARIABLE_EXPR:
         return std::string(expr.token.lexeme);
     case UNARY_EXPR:
-        return " ( " + std::string(expr.token.lexeme) + dump_expr(*expr.left) + " ) ";
+        return " ( " + std::string(expr.token.lexeme) + dump_expr(ast, expr.left) + " ) ";
     case BINARY_EXPR:
-        return " ( " + std::string(expr.token.lexeme) + " " + dump_expr(*expr.left) + ", " +
-            dump_expr(*expr.right) + " ) ";
+        return " ( " + std::string(expr.token.lexeme) + " " + dump_expr(ast, expr.left) + ", " +
+            dump_expr(ast, expr.right) + " ) ";
     case INPUT_EXPR:
-        return " input (" + dump_expr(*expr.left) + ", " + dump_expr(*expr.right) + " ) ";
+        return " input (" + dump_expr(ast, expr.left) + ", " + dump_expr(ast, expr.right) + " ) ";
     default:
         UNREACHABLE;
     }
 }
 
-static inline Stmt* parse_statement(Parser& p);
+static inline StmtId parse_statement(Parser& p);
 
-static inline Stmt* parse_var_decl(Parser& parser) {
+static inline StmtId parse_var_decl(Parser& parser) {
 
     Token type = advance(parser);
     assert(type.type == INTID);
@@ -321,162 +324,157 @@ static inline Stmt* parse_var_decl(Parser& parser) {
     bool is_identifier = match(parser, IDENTIFIER);
     assert(is_identifier);
     if (!is_identifier)
-        return nullptr;
+        return StmtId {};
 
     Token name = previous(parser);
 
-    Expr* init;
+    ExprId init;
     if (match(parser, EQUAL)) init = parse_expr(parser);
 
-    if (!match(parser, SEMICOLON)) return nullptr;
+    assert (init.valid());
 
-    Stmt* s = arena_new<Stmt>(parser.arena);
-    s->kind = DECL_STMT;
-    s->token = type;
-    s->as.decl.expr = init;
-    s->as.decl.name = name;
+    if (!match(parser, SEMICOLON)) return StmtId {};
 
-    return s;
+    Stmt s = Stmt(DECL_STMT, type);
+    s.as.decl.expr = init;
+    s.as.decl.name = name;
+
+    return parser.ast.add(s);
 }
 
-static inline Stmt* parse_assignment_or_expr(Parser& parser) {
+static inline StmtId parse_assignment_or_expr(Parser& parser) {
 
-
-    Expr* lhs = parse_expr(parser);
-    Stmt* s = nullptr;
+    ExprId lhs = parse_expr(parser);
+    StmtId res {};
 
     if (match(parser, EQUAL)) {
-        if (lhs->kind != VARIABLE_EXPR) {
+        if (parser.ast[lhs].kind != VARIABLE_EXPR) {
             parser.errors.push_back({"assigning a value to an expression that is not an identifier"});
-            return nullptr;
+            return StmtId {};
         }
 
 
-        Expr* init = parse_expr(parser);
+        ExprId init = parse_expr(parser);
 
-        s = arena_new<Stmt>(parser.arena);
-        s->kind = ASSIGN_STMT;
-        s->token = lhs->token;
-        s->as.assign.target = lhs;
-        s->as.assign.expr = init;
+        Stmt s = Stmt(ASSIGN_STMT, parser.ast[lhs].token);
+        s.as.assign.target = lhs;
+        s.as.assign.expr = init;
+        res = parser.ast.add(s);
     }
     else {
-        s = arena_new<Stmt>(parser.arena);
-        s->kind = EXPR_STMT;
-        s->token = lhs->token;
-        s->as.expr.expr = lhs;
+        Stmt s = Stmt(EXPR_STMT, parser.ast[lhs].token);
+        s.as.expr.expr = lhs;
+        res = parser.ast.add(s);
     }
 
-    if (!match(parser, SEMICOLON)) return nullptr;
+    if (!match(parser, SEMICOLON)) return StmtId {};
 
-    return s;
+    return res;
 }
 
-static inline Stmt* parse_if(Parser& p) {
+static inline StmtId parse_if(Parser& p) {
 
     Token kw = advance(p);
     assert(kw.type == IF);
     if (!match(p, LEFT_PAREN)) p.errors.push_back({"expected left paren after if"});
 
-    Expr* guard = parse_expr(p);
+    ExprId guard = parse_expr(p);
 
     if (!match(p, RIGHT_PAREN)) p.errors.push_back({"expected right paren after guard"});
 
-    Stmt* then_body = parse_statement(p);
-    Stmt* else_body = nullptr;
+    StmtId then_body = parse_statement(p);
+    StmtId else_body {};
 
     if (match(p, ELSE)) else_body = parse_statement(p);
 
-    Stmt* if_stmt = arena_new<Stmt>(p.arena);
-    if_stmt->kind = IF_STMT;
-    if_stmt->token = kw;
-    if_stmt->as.if_stmt.guard = guard;
-    if_stmt->as.if_stmt.then_branch = then_body;
-    if_stmt->as.if_stmt.else_branch = else_body;
+    Stmt if_stmt (IF_STMT, kw);
+    if_stmt.kind = IF_STMT;
+    if_stmt.token = kw;
+    if_stmt.as.if_stmt.guard = guard;
+    if_stmt.as.if_stmt.then_branch = then_body;
+    if_stmt.as.if_stmt.else_branch = else_body;
 
-    return if_stmt;
+    return p.ast.add(if_stmt);
 }
 
-static inline Stmt* parse_assert(Parser& p) {
+static inline StmtId parse_assert(Parser& p) {
 
     Token kw = advance(p);
     assert(kw.type == ASSERT);
     if (!match(p, LEFT_PAREN)) p.errors.push_back({"expected left paren after assert"});
 
-    Expr* guard = parse_expr(p);
+    ExprId guard = parse_expr(p);
 
     if (!match(p, RIGHT_PAREN)) p.errors.push_back({"expected right paren after assert expr"});
 
-    Stmt* assert_stmt = arena_new<Stmt>(p.arena);
-    assert_stmt->kind = ASSERT_STMT;
-    assert_stmt->token = kw;
-    assert_stmt->as.expr.expr = guard;
+    Stmt assert_stmt (ASSERT_STMT, kw);
+    assert_stmt.as.expr.expr = guard;
 
-    if (!match(p, SEMICOLON)) return nullptr;
+    if (!match(p, SEMICOLON)) return StmtId {};
 
-    return assert_stmt;
+    return p.ast.add(assert_stmt);
 }
 
-static inline Stmt* parse_while(Parser& p) {
+static inline StmtId parse_while(Parser& p) {
 
     Token kw = advance(p);
     assert(kw.type == WHILE);
     if (!match(p, LEFT_PAREN)) p.errors.push_back({"expected left paren after while"});
 
-    Expr* guard = parse_expr(p);
+    ExprId guard = parse_expr(p);
 
     if (!match(p, RIGHT_PAREN)) p.errors.push_back({"expected right paren after guard"});
 
-    Stmt* then_body = parse_statement(p);
+    StmtId then_body = parse_statement(p);
 
-    Stmt* while_stmt = arena_new<Stmt>(p.arena);
-    while_stmt->kind = WHILE_STMT;
-    while_stmt->token = kw;
-    while_stmt->as.while_stmt.guard = guard;
-    while_stmt->as.while_stmt.then_branch = then_body;
+    Stmt while_stmt (WHILE_STMT, kw);
+    while_stmt.as.while_stmt.guard = guard;
+    while_stmt.as.while_stmt.then_branch = then_body;
 
-    return while_stmt;
+    return p.ast.add(while_stmt);
 }
 
-static inline Stmt* parse_block(Parser& p) {
+static inline StmtId parse_block(Parser& p) {
 
     Token kw = advance(p);
     assert(kw.type == LEFT_BRACE);
 
-    std::vector<Stmt*> res;
+    // std::vector<Stmt*> res;
+
+    const usize first = p.ast.stmts.size();
+    StmtId last {};
 
     while (!check_eq(p, RIGHT_BRACE) && more(p)) {
-        res.push_back(parse_statement(p));
+        last = parse_statement(p);
     }
+
+    const usize count = last.id - first + 1;
 
     if (!match(p, RIGHT_BRACE)) p.errors.push_back({"expected right brace closing block"});
 
-    Stmt* block = arena_new<Stmt>(p.arena);
-    block->kind = BLOCK_STMT;
-    block->token = kw;
-    block->as.block.stmts = res;
+    Stmt block (BLOCK_STMT, kw);
+    block.as.block.first = StmtId {.id = first};
+    block.as.block.count = count;
 
-    return block;
+    return p.ast.add(block);
 }
 
-static inline Stmt* parse_return(Parser& p) {
+static inline StmtId parse_return(Parser& p) {
 
     Token kw = advance(p);
     assert(kw.type == RETURN);
 
-    Expr* expr = parse_expr(p);
+    ExprId expr = parse_expr(p);
 
     if (!match(p, SEMICOLON)) p.errors.push_back({"expected semicolon after return"});
 
-    Stmt* ret_stmt = arena_new<Stmt>(p.arena);
-    ret_stmt->kind = RET_STMT;
-    ret_stmt->token = kw;
-    ret_stmt->as.ret_stmt.expr = expr;
+    Stmt ret_stmt (RET_STMT, kw);
+    ret_stmt.as.ret_stmt.expr = expr;
 
-    return ret_stmt;
+    return p.ast.add(ret_stmt);
 }
 
-static inline Stmt* parse_statement(Parser& p) {
+static inline StmtId parse_statement(Parser& p) {
 
     switch (peek(p).type) {
         case INTID:
@@ -497,43 +495,47 @@ static inline Stmt* parse_statement(Parser& p) {
 }
 
 
-std::vector<Stmt*> parse_program(Parser& p, std::vector<ParseError> errors) {
+std::vector<StmtId> parse_program(Parser& p, std::vector<ParseError> errors) {
 
-    std::vector<Stmt*> res;
+    std::vector<StmtId> res;
 
     while (more(p)) {
-        Stmt* s = parse_statement(p);
-
+        StmtId s = parse_statement(p);
         res.push_back(s);
     }
 
     return res;
 }
 
-std::string dump_stmt(const Stmt& s) {
+std::string dump_stmt(const Ast& ast, StmtId s_id) {
+
+    assert(s_id.valid());
+    const Stmt& s = ast[s_id];
+
     switch (s.kind) {
     case DECL_STMT:
-        return std::string(s.token.lexeme) + " " + std::string(s.as.decl.name.lexeme) + " = " + (dump_expr(*s.as.decl.expr));
+        return std::string(s.token.lexeme) + " " + std::string(s.as.decl.name.lexeme) + " = " + (dump_expr(ast, s.as.decl.expr));
     case ASSIGN_STMT:
-        return std::string(s.as.assign.target->token.lexeme) + " = " + (dump_expr(*s.as.assign.expr));
+        return std::string(ast[s.as.assign.target].token.lexeme) + " = " + (dump_expr(ast, s.as.assign.expr));
     case EXPR_STMT:
-        return (dump_expr(*s.as.expr.expr));
+        return (dump_expr(ast, s.as.expr.expr));
     case ASSERT_STMT:
-        return ("assert (" + dump_expr(*s.as.expr.expr) + ")");
+        return ("assert (" + dump_expr(ast, s.as.expr.expr) + ")");
     case RET_STMT:
-        return ("return " + dump_expr(*s.as.ret_stmt.expr));
+        return ("return " + dump_expr(ast, s.as.ret_stmt.expr));
     case IF_STMT:
-        return "if " + dump_expr(*s.as.if_stmt.guard)
-            + dump_stmt(*s.as.if_stmt.then_branch) + " else " +
-            (s.as.if_stmt.else_branch ? dump_stmt(*s.as.if_stmt.else_branch) : "");
+        return "if " + dump_expr(ast, s.as.if_stmt.guard)
+            + dump_stmt(ast, s.as.if_stmt.then_branch) + " else " +
+            (s.as.if_stmt.else_branch.valid() ? dump_stmt(ast, s.as.if_stmt.else_branch) : "");
     case WHILE_STMT:
-        return "while " + dump_expr(*s.as.while_stmt.guard)
-            + dump_stmt(*s.as.while_stmt.then_branch);
+        return "while " + dump_expr(ast, s.as.while_stmt.guard)
+            + dump_stmt(ast, s.as.while_stmt.then_branch);
     case BLOCK_STMT:
         {
             std::string res = "{\n";
-            for (auto x : s.as.block.stmts) {
-                res += dump_stmt(*x) + "\n";
+            StmtId first = s.as.block.first;
+            for (usize i = first.id; i < i + s.as.block.count; ++i) {
+                res += dump_stmt(ast, StmtId {.id = i}) + "\n";
             }
             return res + "\n}\n";
         }

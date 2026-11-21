@@ -1,7 +1,25 @@
 #pragma once
 
 #include <cassert>
+#include <cstdint>
 #include <string>
+
+
+struct ExprId {
+    usize id = SIZE_MAX;
+
+    bool valid() const {
+        return id != SIZE_MAX;
+    }
+};
+
+struct StmtId {
+    usize id = SIZE_MAX;
+
+    bool valid() const {
+        return id != SIZE_MAX;
+    }
+};
 
 enum ExprKind {
     LITERAL_EXPR,
@@ -43,25 +61,14 @@ struct Expr {
 
     UnaryOperatorKind un_op;
     BinaryOperatorKind bin_op;
-    Expr* left;
-    Expr* right;
-
-    // used by function calls, otherwise empty
-    std::vector<Expr*> args;
+    ExprId left;
+    ExprId right;
 };
-
 
 struct ParseError {
     std::string inner;
 };
 
-
-struct Parser {
-    const std::vector<Token>& tokens;
-    std::vector<ParseError> errors;
-    usize pos;
-    Arena* arena;
-};
 
 enum StmtKind {
     EXPR_STMT,
@@ -81,16 +88,16 @@ struct Stmt {
 
     union StmtData {
 
-        struct { Expr* expr; } expr;
-        struct { Token name; Expr* expr; } decl;
-        struct { Expr* target; Expr* expr; } assign;
-        struct { Expr* expr; } ret_stmt;
-        struct { Expr* guard; Stmt* then_branch; Stmt* else_branch; } if_stmt;
-        struct { Expr* guard; Stmt* then_branch; } while_stmt;
-        struct { std::vector<Stmt*> stmts; } block;
+        struct { ExprId expr; } expr;
+        struct { Token name; ExprId expr; } decl;
+        struct { ExprId target; ExprId expr; } assign;
+        struct { ExprId expr; } ret_stmt;
+        struct { ExprId guard; StmtId then_branch; StmtId else_branch; } if_stmt;
+        struct { ExprId guard; StmtId then_branch; } while_stmt;
+        struct { StmtId first; usize count; } block;
 
         explicit StmtData() {
-            expr.expr = nullptr;
+            expr.expr = ExprId();
         }
 
         ~StmtData() { }
@@ -99,10 +106,40 @@ struct Stmt {
     explicit Stmt(StmtKind k, Token t) : kind(k), token(t) {
 
     }
-
 };
 
-std::vector<Stmt*> parse_program(Parser& p, std::vector<ParseError> errors);
+struct Ast {
+    std::vector<Expr> exprs;
+    std::vector<Stmt> stmts;
+
+    ExprId add(const Expr& e) {
+        exprs.push_back(e);
+        return {exprs.size() - 1};
+    }
+
+    StmtId add(const Stmt& s) {
+        stmts.push_back(s);
+        return {stmts.size() - 1};
+    }
+
+    const Expr& operator[](ExprId id) const {
+        return exprs[id.id];
+    }
+
+    const Stmt& operator[](StmtId id) const {
+        return stmts[id.id];
+    }
+};
+
+struct Parser {
+    Ast ast;
+    const std::vector<Token>& tokens;
+    std::vector<ParseError> errors;
+    usize pos;
+};
+
+std::vector<StmtId> parse_program(Parser& p, std::vector<ParseError> errors);
+void free_parser_pool();
 
 std::string dump_expr(const Expr& expr);
 std::string dump_stmt(const Stmt& s);
