@@ -1,4 +1,3 @@
-#include <iostream>
 #include <set>
 
 static u32 id_tracker = 0U;
@@ -8,8 +7,8 @@ struct ConstructionResult {
     CfgNodeId out;
 };
 
-static ConstructionResult inner_get_cfg(CFG& cfg, const std::vector<StmtId>& stmt_list, Program& program);
-ConstructionResult inner_get_cfg(CFG& cfg, Program& program);
+static ConstructionResult inner_get_cfg(CFG& cfg, const std::vector<StmtId>& stmt_list, ParsedProgram& program);
+ConstructionResult inner_get_cfg(CFG& cfg, ParsedProgram& program);
 
 inline ConstructionResult make_assign_node(CFG& cfg, const Stmt& s) {
     Node node {};
@@ -97,21 +96,12 @@ inline ConstructionResult make_nop(CFG& cfg) {
     return r;
 }
 
-inline ConstructionResult make_block_node(CFG& cfg, Program& program, const Stmt& s) {
-
+inline ConstructionResult make_block_node(CFG& cfg, ParsedProgram& program, const Stmt& s) {
     assert(s.kind == BLOCK_STMT);
-
-    // usize upto = s.as.block.first.id + s.as.block.count;
-    //
-    // CfgNodeId cursor = root;
-    // while (cfg[cursor].true_edge.valid()) {
-    //     cursor = cfg[cursor].true_edge;
-    // }
-
     return inner_get_cfg(cfg, s.children, program);
 }
 
-ExprId expr_negate(Ast& ast, const Expr& e) {
+Expr expr_negate(const Expr& e) {
     assert(e.kind == BINARY_EXPR); // TODO: could be unary too but whatever
 
     Expr negated {};
@@ -138,10 +128,11 @@ ExprId expr_negate(Ast& ast, const Expr& e) {
         TODO;
     }
 
-    return ast.add(negated);
+    return negated;
+    // return ast.add(negated);
 }
 
-inline ConstructionResult make_if(CFG& cfg, Program& program, const Stmt& s) {
+inline ConstructionResult make_if(CFG& cfg, ParsedProgram& program, const Stmt& s) {
 
     assert(s.kind == IF_STMT);
 
@@ -151,7 +142,8 @@ inline ConstructionResult make_if(CFG& cfg, Program& program, const Stmt& s) {
     node.stmt.kind = CFG_EXPR_GUARD;
     node.stmt.expr = s.as.if_stmt.guard;
     node.stmt.lhs = s.as.if_stmt.guard;
-    node.stmt.rhs = expr_negate(ast, ast[s.as.if_stmt.guard]);
+    Expr negated = expr_negate(ast[s.as.if_stmt.guard]);
+    node.stmt.rhs = ast.add(negated);
     node.id = id_tracker;
     node.pp = SyntheticPP {id_tracker++};
 
@@ -185,7 +177,7 @@ inline ConstructionResult make_if(CFG& cfg, Program& program, const Stmt& s) {
     return r;
 }
 
-inline ConstructionResult make_while(CFG& cfg, Program& program, const Stmt& s) {
+inline ConstructionResult make_while(CFG& cfg, ParsedProgram& program, const Stmt& s) {
 
     assert(s.kind == WHILE_STMT);
 
@@ -216,7 +208,7 @@ inline ConstructionResult make_while(CFG& cfg, Program& program, const Stmt& s) 
     return r;
 }
 
-static ConstructionResult inner_get_cfg(CFG& cfg, const std::vector<StmtId>& stmt_list, Program& program) {
+static ConstructionResult inner_get_cfg(CFG& cfg, const std::vector<StmtId>& stmt_list, ParsedProgram& program) {
 
     CfgNodeId root = make_nop(cfg).root;
     CfgNodeId prev = root;
@@ -260,13 +252,13 @@ static ConstructionResult inner_get_cfg(CFG& cfg, const std::vector<StmtId>& stm
 
 }
 
-ConstructionResult inner_get_cfg(CFG& cfg, Program& program) {
+ConstructionResult inner_get_cfg(CFG& cfg, ParsedProgram& program) {
     return inner_get_cfg(cfg, program.inner, program);
 }
 
-CFG get_cfg(Program& program) {
+CFG get_cfg(ParsedProgram& program) {
 
-    CFG cfg {};
+    CFG cfg {.parsed_program = program};
     CfgNodeId root = inner_get_cfg(cfg, program).root;
     cfg.root = root;
     return cfg;

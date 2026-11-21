@@ -65,13 +65,22 @@ struct CFG {
         return nodes[id.id];
     }
 
+    const Expr operator[](ExprId id) const {
+        return (*parsed_program.ast)[id];
+    }
+
+    const Stmt operator[](StmtId id) const {
+        return (*parsed_program.ast)[id];
+    }
+
     CfgNodeId root;
+    ParsedProgram& parsed_program;
 };
 
 
-CFG get_cfg(Program& program);
+CFG get_cfg(ParsedProgram& program);
 
-ExprId expr_negate(Ast& ast, const Expr& e);
+Expr expr_negate(const Expr& e);
 
 bool write_cfg_dot(const Ast& ast, const CFG& cfg, const char* path);
 

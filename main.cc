@@ -26,7 +26,7 @@ int main() {
 
     std::cout << "before parser" << std::endl;
 
-    Program program = parse_program(p, {});
+    ParsedProgram program = parse_program(p, {});
 
     std::cout << "program has " << program.inner.size() << " statements" << std::endl;
 
@@ -45,8 +45,8 @@ int main() {
 
     bool done = write_cfg_dot(*program.ast, cfg, "out.dot");
 
-    // auto fixpoint_result = fixpoint_analyze<NonRelational<Interval>>(cfg);
-    //
+    auto fixpoint_result = fixpoint_analyze<NonRelational<Interval>>(cfg);
+
     // std::cout << "have results for " << fixpoint_result.asserts_sat.size() << " asserts" << std::endl;
     //
     // for (const auto& [node, sat] : fixpoint_result.asserts_sat) {

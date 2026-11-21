@@ -5,8 +5,8 @@
 #include "lexer.hh"
 #include "parser.hh"
 #include "cfg.hh"
-// #include "environment.hh"
-// #include "domains/intervals.hh"
-// #include "fixpoint.hh"
+#include "environment.hh"
+#include "domains/intervals.hh"
+#include "fixpoint.hh"
 // #include "html_dump.hh"
 
