@@ -118,7 +118,7 @@ struct Interval {
         return Interval {.kind = SOME, .low = l, .high = h};
     }
 
-    static Interval widen(Interval a, Interval b) {
+    static Interval widening(Interval a, Interval b) {
         return top();
     }
 

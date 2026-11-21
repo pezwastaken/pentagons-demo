@@ -1,3 +1,5 @@
 int a = input(0, 20);
 
-return 0;
+int x = 0;
+
+return 5;

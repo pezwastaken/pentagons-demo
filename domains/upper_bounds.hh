@@ -3,7 +3,6 @@
 #include <cmath>
 #include <algorithm>
 
-
 struct UpperBoundsDomain {
 
     struct UpperBound {

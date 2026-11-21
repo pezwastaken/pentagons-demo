@@ -5,10 +5,14 @@
 #include <unordered_map>
 
 enum AbstractElementKind {
+    BOT,
     SOME,
     TOP,
-    BOT,
 };
+
+inline bool abstract_element_kind_leq(AbstractElementKind a, AbstractElementKind b) {
+    return a <= b;
+}
 
 enum Satisfiability {
     SAT_UNKNOWN,
@@ -31,7 +35,7 @@ concept ValueDomain = requires (V a, V b, isize n, const Expr& unary, const Expr
     { V::satisfies(binary, a, b) } -> std::same_as<Satisfiability>;
     { V::join(a, b) } -> std::same_as<V>;
     { V::meet(a, b) } -> std::same_as<V>;
-    { V::widen(a, b) } -> std::same_as<V>;
+    { V::widening(a, b) } -> std::same_as<V>;
     { V::dump_value(a) } -> std::same_as<std::string>;
     { V::is_bottom(a) } -> std::same_as<bool>;
     { V::is_top(a) } -> std::same_as<bool>;
@@ -93,6 +97,30 @@ struct NonRelational {
             return bot_state();
         }
 
+    }
+
+    static State widening(const State& prev, const State& current) {
+
+        assert(abstract_element_kind_leq(prev.kind, current.kind));
+        State out = current;
+
+        for (const auto& [id, value] : prev.env) {
+
+            assert(current.env.contains(id));
+            V current_value = current.env.at(id);
+
+            if (V::leq(value, current_value)) {
+                V widened = V::widening(value, current_value);
+                out.env[id] = widened;
+            }
+        }
+
+#ifndef NDEBUG
+        if (!out.env.empty()) {
+            assert(out.kind == SOME);
+        }
+#endif
+        return out;
     }
 
     static State set(State s, const std::string& name, V value) {
@@ -232,7 +260,7 @@ concept StateDomain = requires(D::State s, const std::string& x, const Expr& e) 
     // TODO: this should return a tuple <abstract value, abstract state> (function calls with side effects)
 
     { D::assume(s, e) } -> std::same_as<typename D::State>;
-    // { D::widen(s, s) } -> std::same_as<typename D::State>;
+    { D::widening(s, s) } -> std::same_as<typename D::State>;
 
 };
 

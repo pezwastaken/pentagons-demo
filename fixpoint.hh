@@ -1,8 +1,12 @@
 #pragma once
 
+#include "cfg.hh"
 #include "environment.hh"
 #include <deque>
 #include <unordered_map>
+#include <utility>
+
+static constexpr u32 WIDENING_THRESHOLD = 20U;
 
 template <StateDomain D>
 typename D::State transfer_declaration(typename D::State& entry_state, Node* n) {
@@ -127,12 +131,51 @@ SplitState<D> transfer_split(typename D::State entry_state, Node* n) {
 }
 
 template <StateDomain D>
+std::pair<typename D::State, bool> fixpoint_propagate(
+        const typename D::State& entry_state,
+        Node* src,
+        Node* dst,
+        std::unordered_map<Node*, typename D::State>& node_states,
+        std::unordered_map<Node*, u32>& iter_counter,
+        FixpointResult<D>& fixpoint_result) {
+
+    using S = typename D::State;
+    S out_state = transfer(entry_state, src, fixpoint_result);
+
+    S prev = node_states[dst];
+    S joined = D::join(out_state, prev);
+
+    bool should_reque_node = false;
+
+    // it's a guard, may have to widen
+    if (dst->stmt.kind == CFG_EXPR_GUARD) {
+
+        if (!iter_counter.contains(dst)) {
+            iter_counter[dst] = 0U;
+        }
+        else if (iter_counter[dst] >= WIDENING_THRESHOLD){
+            std::cout << "triggering widening" << std::endl;
+            joined = D::widening(prev, joined);
+        }
+        ++iter_counter[dst];
+    }
+
+    if (!D::leq(joined, prev)) {
+        node_states[dst] = joined;
+        should_reque_node = true;
+    }
+
+    return std::make_pair(joined, should_reque_node);
+}
+
+template <StateDomain D>
 FixpointResult<D> fixpoint_analyze(const CFG& cfg) {
 
     using S = typename D::State;
 
     FixpointResult<D> result;
     std::unordered_map<Node*, S>& node_states = result.node_states;
+    std::unordered_map<Node*, u32> iter_counter {};
 
     Node* root = cfg.root;
 
@@ -152,16 +195,13 @@ FixpointResult<D> fixpoint_analyze(const CFG& cfg) {
 
             if (x->true_edge != nullptr) {
 
-                Node* dest = x->true_edge;
-                usize dest_id = dest->id;
+                Node* dst = x->true_edge;
+                S prev = node_states[dst];
+                std::pair<S, bool> out =
+                    fixpoint_propagate<D>(entry_state, x, dst, node_states, iter_counter, result);
 
-                S prev = node_states[dest];
-
-                S joined = D::join(out_state, prev);
-
-                if (!D::leq(joined, prev)) {
-                    node_states[dest] = joined;
-                    que.push_back(dest);
+                if (out.second) {
+                    que.push_back(dst);
                 }
             }
         }
@@ -172,40 +212,35 @@ FixpointResult<D> fixpoint_analyze(const CFG& cfg) {
             // state transfer along the true edge
             if (x->true_edge != nullptr) {
 
-                Node* dest = x->true_edge;
-                usize dest_id = dest->id;
+                Node* dst = x->true_edge;
+                S prev = node_states[dst];
+                std::pair<S, bool> out =
+                    fixpoint_propagate<D>(entry_state, x, dst, node_states, iter_counter, result);
 
-                S prev = node_states[dest];
-
-                S joined = D::join(split_state.true_state, prev);
-
-                if (!D::leq(joined, prev)) {
-                    node_states[dest] = joined;
-                    que.push_back(dest);
+                if (out.second) {
+                    que.push_back(dst);
                 }
             }
 
             // state transfer along the false edge
             if (x->false_edge != nullptr) {
-                Node* dest = x->false_edge;
-                usize dest_id = dest->id;
 
-                S prev = node_states[dest];
+                Node* dst = x->false_edge;
+                S prev = node_states[dst];
+                std::pair<S, bool> out =
+                    fixpoint_propagate<D>(entry_state, x, dst, node_states, iter_counter, result);
 
-                S joined = D::join(split_state.false_state, prev);
-
-                if (!D::leq(joined, prev)) {
-                    node_states[dest] = joined;
-                    que.push_back(dest);
+                if (out.second) {
+                    que.push_back(dst);
                 }
             }
         }
     }
 
-    // for (const auto& [id, state] : node_states) {
-    //     std::cout << "state for node id: " << id << D::dump_state(node_states[id])
-    //         << std::endl;
-    // }
+    for (const auto& [id, state] : node_states) {
+        std::cout << "state for node id: " << id << D::dump_state(node_states[id])
+            << std::endl;
+    }
 
     return result;
 }
