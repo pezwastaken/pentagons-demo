@@ -123,10 +123,14 @@ struct Ast {
     }
 
     const Expr& operator[](ExprId id) const {
+        assert(id.valid());
+        assert(id.id < exprs.size());
         return exprs[id.id];
     }
 
     const Stmt& operator[](StmtId id) const {
+        assert(id.valid());
+        assert(id.id < stmts.size());
         return stmts[id.id];
     }
 };

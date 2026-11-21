@@ -1,3 +1,4 @@
+#include <iostream>
 #include <optional>
 
 struct OpInfo {
@@ -294,7 +295,6 @@ static inline ExprId parse_expr(Parser& parser, i32 min_prec) {
 
 std::string dump_expr(const Ast& ast, ExprId expr_id) {
 
-    assert(expr_id.valid());
     const Expr& expr = ast[expr_id];
 
     switch (expr.kind) {
@@ -439,11 +439,13 @@ static inline StmtId parse_block(Parser& p) {
     Token kw = advance(p);
     assert(kw.type == LEFT_BRACE);
 
-    // std::vector<Stmt*> res;
+    Stmt block (BLOCK_STMT, kw);
+    StmtId block_id = p.ast.add(block);
 
     const usize first = p.ast.stmts.size();
-    StmtId last {};
+    assert(block_id.id + 1U == first);
 
+    StmtId last {};
     while (!check_eq(p, RIGHT_BRACE) && more(p)) {
         last = parse_statement(p);
     }
@@ -452,11 +454,13 @@ static inline StmtId parse_block(Parser& p) {
 
     if (!match(p, RIGHT_BRACE)) p.errors.push_back({"expected right brace closing block"});
 
-    Stmt block (BLOCK_STMT, kw);
-    block.as.block.first = StmtId {.id = first};
-    block.as.block.count = count;
+    p.ast.stmts[block_id.id].as.block.first = StmtId {.id = first};
+    p.ast.stmts[block_id.id].as.block.count = count;
 
-    return p.ast.add(block);
+    std::cout << "parsing block: first is " << p.ast.stmts[block_id.id].as.block.first.id << " and count is "
+        << p.ast.stmts[block_id.id].as.block.count << std::endl;
+
+    return block_id;
 }
 
 static inline StmtId parse_return(Parser& p) {
@@ -507,7 +511,17 @@ std::vector<StmtId> parse_program(Parser& p, std::vector<ParseError> errors) {
     return res;
 }
 
+static std::string with_indent(u32 c) {
+    std::string res = "";
+    for (u32 i = 0; i < c; ++i) {
+        res += "\t";
+    }
+    return res;
+}
+
 std::string dump_stmt(const Ast& ast, StmtId s_id) {
+
+    static u32 indent_count = 0U;
 
     assert(s_id.valid());
     const Stmt& s = ast[s_id];
@@ -523,23 +537,36 @@ std::string dump_stmt(const Ast& ast, StmtId s_id) {
         return ("assert (" + dump_expr(ast, s.as.expr.expr) + ")");
     case RET_STMT:
         return ("return " + dump_expr(ast, s.as.ret_stmt.expr));
-    case IF_STMT:
-        return "if " + dump_expr(ast, s.as.if_stmt.guard)
+    case IF_STMT: {
+        ++indent_count;
+        auto res = "if " + dump_expr(ast, s.as.if_stmt.guard)
             + dump_stmt(ast, s.as.if_stmt.then_branch) + " else " +
             (s.as.if_stmt.else_branch.valid() ? dump_stmt(ast, s.as.if_stmt.else_branch) : "");
-    case WHILE_STMT:
-        return "while " + dump_expr(ast, s.as.while_stmt.guard)
+        --indent_count;
+        return res;
+    }
+    case WHILE_STMT: {
+        ++indent_count;
+        auto res = "while " + dump_expr(ast, s.as.while_stmt.guard)
             + dump_stmt(ast, s.as.while_stmt.then_branch);
+        --indent_count;
+        return res;
+    }
     case BLOCK_STMT:
         {
             std::string res = "{\n";
             StmtId first = s.as.block.first;
-            for (usize i = first.id; i < i + s.as.block.count; ++i) {
-                res += dump_stmt(ast, StmtId {.id = i}) + "\n";
+
+            ++indent_count;
+
+            for (usize i = first.id; i < first.id + s.as.block.count; ++i) {
+                std::cout << "accessing element " << i << std::endl;
+                res += with_indent(indent_count) + dump_stmt(ast, StmtId {.id = i}) + "\n";
             }
-            return res + "\n}\n";
+            return res + "\n" + with_indent(--indent_count) + "}\n";
         }
     default:
         UNREACHABLE;
     }
 }
+
