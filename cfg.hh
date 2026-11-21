@@ -14,13 +14,14 @@ enum CFGStmtKind {
     CFG_NOP,
 };
 
+
 struct CFGStmt {
 
     Token name; // declaration
-    Expr* lhs; // assignments   / true edge of guard
-    Expr* rhs; // assignments/declarations  / false edge of guard
+    ExprId lhs; // assignments   / true edge of guard
+    ExprId rhs; // assignments/declarations  / false edge of guard
 
-    Expr* expr; // expressions and guards
+    ExprId expr; // expressions and guards
 
     CFGStmtKind kind;
 
@@ -48,11 +49,11 @@ struct CFG {
 
 void cfg_set_arena(Arena* arena);
 
-CFG get_cfg(std::vector<Stmt*>& program);
+CFG get_cfg(Program& program);
 
-Expr* expr_negate(const Expr& e);
+ExprId expr_negate(Ast& ast, const Expr& e);
 
-bool write_cfg_dot(CFG cfg, const char* path);
+bool write_cfg_dot(const Ast& ast, CFG cfg, const char* path);
 
 std::string dump_cfg_as_text(CFG cfg);
 

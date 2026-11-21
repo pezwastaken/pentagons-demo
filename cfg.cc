@@ -1,4 +1,3 @@
-#include "parser.hh"
 #include <unordered_set>
 
 static Arena* mem_arena = nullptr;
@@ -13,9 +12,9 @@ void cfg_set_arena(Arena *arena) {
     mem_arena = arena;
 }
 
-Node* inner_get_cfg(std::vector<Stmt*>& program);
+Node* inner_get_cfg(Program& program, usize from, usize to);
 
-inline ConstructionResult make_assign_node(Stmt& s) {
+inline ConstructionResult make_assign_node(const Stmt& s) {
     Node* node = new Node;
     node->stmt.kind = CFG_ASSIGNMENT;
     node->stmt.lhs = s.as.assign.target;
@@ -29,7 +28,7 @@ inline ConstructionResult make_assign_node(Stmt& s) {
     return r;
 }
 
-inline ConstructionResult make_decl_node(Stmt& s) {
+inline ConstructionResult make_decl_node(const Stmt& s) {
     Node* node = new Node;
     node->stmt.kind = CFG_DECLARATION;
     node->stmt.name = s.as.decl.name;
@@ -42,10 +41,10 @@ inline ConstructionResult make_decl_node(Stmt& s) {
     return r;
 }
 
-inline ConstructionResult make_expr_node(Stmt& s) {
+inline ConstructionResult make_expr_node(const Stmt& s) {
     Node* node = new Node;
     node->stmt.kind = CFG_EXPR;
-    assert(s.as.expr.expr != nullptr);
+    assert(s.as.expr.expr.valid());
     node->stmt.expr = s.as.expr.expr;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
@@ -55,11 +54,10 @@ inline ConstructionResult make_expr_node(Stmt& s) {
     return r;
 }
 
-inline ConstructionResult make_assert_node(Stmt& s) {
-    std::cout << "CFG: making assert node" << std::endl;
+inline ConstructionResult make_assert_node(const Stmt& s) {
     Node* node = new Node;
     node->stmt.kind = CFG_ASSERT;
-    assert(s.as.expr.expr != nullptr);
+    assert(s.as.expr.expr.valid());
     node->stmt.expr = s.as.expr.expr;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
@@ -69,10 +67,10 @@ inline ConstructionResult make_assert_node(Stmt& s) {
     return r;
 }
 
-inline ConstructionResult make_ret_node(Stmt& s) {
+inline ConstructionResult make_ret_node(const Stmt& s) {
     Node* node = new Node;
     node->stmt.kind = CFG_RETURN;
-    assert(s.as.ret_stmt.expr != nullptr);
+    assert(s.as.ret_stmt.expr.valid());
     node->stmt.expr = s.as.ret_stmt.expr;
     node->true_edge = nullptr;
     node->false_edge = nullptr;
@@ -93,11 +91,12 @@ inline ConstructionResult make_nop() {
     return r;
 }
 
-inline ConstructionResult make_block_node(Stmt& s) {
+inline ConstructionResult make_block_node(Program& program, const Stmt& s) {
 
     assert(s.kind == BLOCK_STMT);
 
-    Node* root = inner_get_cfg(s.as.block.stmts);
+    usize upto = s.as.block.first.id + s.as.block.count;
+    Node* root = inner_get_cfg(program, s.as.block.first.id, upto);
 
     Node* cursor = root;
     while (cursor->false_edge) {
@@ -108,65 +107,69 @@ inline ConstructionResult make_block_node(Stmt& s) {
     return r;
 }
 
-Expr* expr_negate(const Expr& e) {
+ExprId expr_negate(Ast& ast, const Expr& e) {
     assert(mem_arena);
     assert(e.kind == BINARY_EXPR); // TODO: could be unary too but whatever
 
-    Expr* negated = arena_new<Expr>(mem_arena);
-    negated->kind = BINARY_EXPR;
-    negated->token = e.token;
-    negated->type = INT;
-    negated->left = e.left;
-    negated->right = e.right;
+    Expr negated {};
+    negated.kind = BINARY_EXPR;
+    negated.token = e.token;
+    negated.type = INT;
+    negated.left = e.left;
+    negated.right = e.right;
 
     switch (e.bin_op) {
     case OP_BINARY_EQ:
-        negated->bin_op = OP_BINARY_NE; break;
+        negated.bin_op = OP_BINARY_NE; break;
     case OP_BINARY_NE:
-        negated->bin_op = OP_BINARY_EQ; break;
+        negated.bin_op = OP_BINARY_EQ; break;
     case OP_BINARY_LT:
-        negated->bin_op = OP_BINARY_GE; break;
+        negated.bin_op = OP_BINARY_GE; break;
     case OP_BINARY_LE:
-        negated->bin_op = OP_BINARY_GT; break;
+        negated.bin_op = OP_BINARY_GT; break;
     case OP_BINARY_GT:
-        negated->bin_op = OP_BINARY_LE; break;
+        negated.bin_op = OP_BINARY_LE; break;
     case OP_BINARY_GE:
-        negated->bin_op = OP_BINARY_LT; break;
+        negated.bin_op = OP_BINARY_LT; break;
     default:
         TODO;
     }
 
-    return negated;
+    return ast.add(negated);
 }
 
-inline ConstructionResult make_if(Stmt& s) {
+inline ConstructionResult make_if(Program& program, const Stmt& s) {
 
     assert(s.kind == IF_STMT);
+
+    Ast& ast = *program.ast;
 
     Node* node = new Node;
     node->stmt.kind = CFG_EXPR_GUARD;
     node->stmt.expr = s.as.if_stmt.guard;
     node->stmt.lhs = s.as.if_stmt.guard;
-    node->stmt.rhs = expr_negate(*s.as.if_stmt.guard);
+    node->stmt.rhs = expr_negate(ast, ast[s.as.if_stmt.guard]);
     node->true_edge = nullptr;
     node->false_edge = nullptr;
     node->id = id_tracker;
     node->pp = SyntheticPP {id_tracker++};
 
-    assert(s.as.if_stmt.then_branch != nullptr);
-    assert(s.as.if_stmt.then_branch->kind == BLOCK_STMT);
+    assert(s.as.if_stmt.then_branch.valid());
+    assert(ast[s.as.if_stmt.then_branch].kind == BLOCK_STMT);
 
-    ConstructionResult then_branch_res = make_block_node(*s.as.if_stmt.then_branch);
+    ConstructionResult then_branch_res =
+        make_block_node(program, ast[s.as.if_stmt.then_branch]);
     ConstructionResult else_branch_res;
 
-    if (s.as.if_stmt.else_branch != nullptr) {
-        else_branch_res = make_block_node(*s.as.if_stmt.else_branch);
+    if (s.as.if_stmt.else_branch.valid()) {
+        else_branch_res =
+            make_block_node(program, ast[s.as.if_stmt.else_branch]);
         node->false_edge = else_branch_res.root;
     }
 
     Node* join = make_nop().root;
 
-    if (s.as.if_stmt.else_branch != nullptr) {
+    if (s.as.if_stmt.else_branch.valid()) {
         else_branch_res.out->true_edge = join;
     }
     else {
@@ -180,9 +183,11 @@ inline ConstructionResult make_if(Stmt& s) {
     return r;
 }
 
-inline ConstructionResult make_while(Stmt& s) {
+inline ConstructionResult make_while(Program& program, const Stmt& s) {
 
     assert(s.kind == WHILE_STMT);
+
+    Ast& ast = *program.ast;
 
     Node* node = new Node;
     node->stmt.kind = CFG_EXPR_GUARD;
@@ -192,12 +197,13 @@ inline ConstructionResult make_while(Stmt& s) {
     node->id = id_tracker;
     node->pp = SyntheticPP {id_tracker++};
 
-    assert(s.as.while_stmt.then_branch != nullptr);
-    assert(s.as.while_stmt.then_branch->kind == BLOCK_STMT);
+    assert(s.as.while_stmt.then_branch.valid());
+    assert(ast[s.as.while_stmt.then_branch].kind == BLOCK_STMT);
 
     Node* exit = make_nop().root;
 
-    ConstructionResult then_branch_res = make_block_node(*s.as.while_stmt.then_branch);
+    ConstructionResult then_branch_res =
+        make_block_node(program, ast[s.as.while_stmt.then_branch]);
 
     node->true_edge = then_branch_res.root;
     node->false_edge = exit;
@@ -208,24 +214,29 @@ inline ConstructionResult make_while(Stmt& s) {
     return r;
 }
 
-Node* inner_get_cfg(std::vector<Stmt*>& program) {
+Node* inner_get_cfg(Program& program, usize from, usize to) {
     Node* root = make_nop().root;
     Node* prev = root;
 
     ConstructionResult r;
 
-    for (auto s : program) {
+    for (usize i = from; i < to; ++i) {
 
-        switch (s->kind) {
+        StmtId s_id = program.inner[i];
 
-        case ASSIGN_STMT: r = make_assign_node(*s); break;
-        case EXPR_STMT: r = make_expr_node(*s); break;
-        case ASSERT_STMT: r = make_assert_node(*s); break;
-        case DECL_STMT: r = make_decl_node(*s); break;
-        case RET_STMT: r = make_ret_node(*s); break;
-        case IF_STMT: r = make_if(*s); break;
-        case WHILE_STMT: r = make_while(*s); break;
-        case BLOCK_STMT: r = make_block_node(*s); break;
+        assert(s_id.valid());
+        const auto& s = (*program.ast)[s_id];
+
+        switch (s.kind) {
+
+        case ASSIGN_STMT: r = make_assign_node(s); break;
+        case EXPR_STMT: r = make_expr_node(s); break;
+        case ASSERT_STMT: r = make_assert_node(s); break;
+        case DECL_STMT: r = make_decl_node(s); break;
+        case RET_STMT: r = make_ret_node(s); break;
+        case IF_STMT: r = make_if(program, s); break;
+        case WHILE_STMT: r = make_while(program, s); break;
+        case BLOCK_STMT: r = make_block_node(program, s); break;
         default:
             UNREACHABLE;
         }
@@ -245,22 +256,24 @@ Node* inner_get_cfg(std::vector<Stmt*>& program) {
     return root;
 }
 
-CFG get_cfg(std::vector<Stmt*>& program) {
-    return CFG { inner_get_cfg(program) };
+CFG get_cfg(Program& program) {
+    return CFG { inner_get_cfg(program, 0U, program.inner.size()) };
 }
 
-static std::string label(const CFGStmt& s, usize id) {
+static std::string label(const Ast& ast, const CFGStmt& s, usize id) {
 
     switch (s.kind) {
         case CFG_DECLARATION:
-            return "[" + std::to_string(id) + "]" + "decl " + std::string(s.name.lexeme) + (s.rhs ? " = " + dump_expr(*s.rhs) : std::string());
+            return "[" + std::to_string(id) + "]" + "decl " + std::string(s.name.lexeme) + (s.rhs.valid() ? " = " + dump_expr(ast, s.rhs) : std::string());
         case CFG_ASSIGNMENT:
-            return "[" + std::to_string(id) + "]" + dump_expr(*s.lhs) + " = " + dump_expr(*s.rhs);
+            return "[" + std::to_string(id) + "]" + dump_expr(ast, s.lhs) + " = " + dump_expr(ast, s.rhs);
         case CFG_EXPR_GUARD:
         case CFG_EXPR:
-            return "[" + std::to_string(id) + "]" + dump_expr(*s.expr);
+            return "[" + std::to_string(id) + "]" + dump_expr(ast, s.expr);
         case CFG_RETURN:
-            return "[" + std::to_string(id) + "]" + " return " + dump_expr(*s.expr);
+            return "[" + std::to_string(id) + "]" + " return " + dump_expr(ast, s.expr);
+        case CFG_ASSERT:
+            return "[" + std::to_string(id) + "]" + " assert " + dump_expr(ast, s.expr);
         case CFG_NOP:
             return "[" + std::to_string(id) + "]" + " nop";
     }
@@ -268,7 +281,7 @@ static std::string label(const CFGStmt& s, usize id) {
 }
 
 
-bool write_cfg_dot(CFG cfg, const char* path) {
+bool write_cfg_dot(const Ast& ast, CFG cfg, const char* path) {
     FILE* f = fopen(path, "w");
     if (!f) return false;
 
@@ -285,7 +298,7 @@ bool write_cfg_dot(CFG cfg, const char* path) {
         if (!n || !seen.insert(n).second) continue;
 
         bool branch = n->true_edge && n->false_edge;
-        fprintf(f, "  n%p [label=\"%s\"];\n", (const void*)n, label(n->stmt, n->id).c_str());
+        fprintf(f, "  n%p [label=\"%s\"];\n", (const void*)n, label(ast, n->stmt, n->id).c_str());
         if (n->true_edge)
             fprintf(f, "  n%p -> n%p%s;\n", (const void*)n, (const void*)n->true_edge,
                     branch ? " [label=\"T\"]" : "");
@@ -303,7 +316,7 @@ bool write_cfg_dot(CFG cfg, const char* path) {
 }
 
 
-std::string cfg_dump_as_text(CFG cfg) {
+std::string cfg_dump_as_text(const Ast& ast, CFG cfg) {
 
     const Node* entry = cfg.root;
 
@@ -324,19 +337,22 @@ std::string cfg_dump_as_text(CFG cfg) {
 
         switch (n->stmt.kind) {
         case CFG_DECLARATION:
-            res += std::string(n->stmt.name.lexeme) + " = " + dump_expr(*n->stmt.rhs) ;
+            res += std::string(n->stmt.name.lexeme) + " = " + dump_expr(ast, n->stmt.rhs);
             break;
         case CFG_ASSIGNMENT:
-            res += dump_expr(*n->stmt.lhs) + " = " + dump_expr(*n->stmt.rhs) ;
+            res += dump_expr(ast, n->stmt.lhs) + " = " + dump_expr(ast, n->stmt.rhs) ;
             break;
         case CFG_EXPR:
-            res += dump_expr(*n->stmt.expr);
+            res += dump_expr(ast, n->stmt.expr);
             break;
         case CFG_EXPR_GUARD:
-            res += dump_expr(*n->stmt.expr);
+            res += dump_expr(ast, n->stmt.expr);
             break;
         case CFG_RETURN:
-            res += "return " + dump_expr(*n->stmt.expr);
+            res += "return " + dump_expr(ast, n->stmt.expr);
+            break;
+        case CFG_ASSERT:
+            res += "assert " + dump_expr(ast, n->stmt.expr);
             break;
         case CFG_NOP:
             res += "NOP";

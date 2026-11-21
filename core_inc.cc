@@ -2,5 +2,5 @@
 
 #include "lexer.cc"
 #include "parser.cc"
-// #include "cfg.cc"
+#include "cfg.cc"
 

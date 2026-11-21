@@ -499,7 +499,7 @@ static inline StmtId parse_statement(Parser& p) {
 }
 
 
-std::vector<StmtId> parse_program(Parser& p, std::vector<ParseError> errors) {
+Program parse_program(Parser& p, std::vector<ParseError> errors) {
 
     std::vector<StmtId> res;
 
@@ -508,7 +508,7 @@ std::vector<StmtId> parse_program(Parser& p, std::vector<ParseError> errors) {
         res.push_back(s);
     }
 
-    return res;
+    return Program {.inner = res, .ast = &p.ast};
 }
 
 static std::string with_indent(u32 c) {

@@ -142,9 +142,14 @@ struct Parser {
     usize pos;
 };
 
-std::vector<StmtId> parse_program(Parser& p, std::vector<ParseError> errors);
+struct Program {
+    std::vector<StmtId> inner;
+    Ast* ast;
+};
+
+Program parse_program(Parser& p, std::vector<ParseError> errors);
 void free_parser_pool();
 
-std::string dump_expr(const Expr& expr);
-std::string dump_stmt(const Stmt& s);
+std::string dump_expr(const Ast& ast, ExprId expr_id);
+std::string dump_stmt(const Ast& ast, StmtId s);
 

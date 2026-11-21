@@ -22,31 +22,31 @@ int main() {
     //     std::cout << std::endl;
     // }
 
-    // Arena* mem_arena = arena_create(1000000);
     Parser p = Parser {.ast = Ast {}, .tokens = tokens, .errors = {}, .pos = 0U};
 
     std::cout << "before parser" << std::endl;
 
-    std::vector<StmtId> program = parse_program(p, {});
+    Program program = parse_program(p, {});
 
-    std::cout << "program has " << program.size() << " statements" << std::endl;
+    std::cout << "program has " << program.inner.size() << " statements" << std::endl;
 
-    for (auto s : program) {
+    for (auto s : program.inner) {
         std::cout << dump_stmt(p.ast, s) << std::endl;
     }
 
     std::cout << "after parsing dump" << std::endl;
 
-    // cfg_set_arena(mem_arena);
-    // CFG cfg = get_cfg(program);
-    //
-    // std::string cfg_text = cfg_dump_as_text(cfg);
-    //
-    // std::cout << "===============\n\n" << std::endl;
-    // std::cout << cfg_text << std::endl;
-    //
-    // bool done = write_cfg_dot(cfg, "out.dot");
-    //
+    Arena* mem_arena = arena_create(1000000);
+    cfg_set_arena(mem_arena);
+    CFG cfg = get_cfg(program);
+
+    std::string cfg_text = cfg_dump_as_text(*program.ast, cfg);
+
+    std::cout << "===============\n\n" << std::endl;
+    std::cout << cfg_text << std::endl;
+
+    // bool done = write_cfg_dot(*program.ast, cfg, "out.dot");
+
     // auto fixpoint_result = fixpoint_analyze<NonRelational<Interval>>(cfg);
     //
     // std::cout << "have results for " << fixpoint_result.asserts_sat.size() << " asserts" << std::endl;
