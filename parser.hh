@@ -83,6 +83,7 @@ enum StmtKind {
 
 struct Stmt {
 
+    std::vector<StmtId> children; // used by block. Not inside the union since non-trivial
     StmtKind kind;
     Token token;
 
@@ -94,7 +95,6 @@ struct Stmt {
         struct { ExprId expr; } ret_stmt;
         struct { ExprId guard; StmtId then_branch; StmtId else_branch; } if_stmt;
         struct { ExprId guard; StmtId then_branch; } while_stmt;
-        struct { StmtId first; usize count; } block;
 
         explicit StmtData() {
             expr.expr = ExprId();

@@ -69,13 +69,11 @@ struct CFG {
 };
 
 
-void cfg_set_arena(Arena* arena);
-
 CFG get_cfg(Program& program);
 
 ExprId expr_negate(Ast& ast, const Expr& e);
 
-bool write_cfg_dot(const Ast& ast, CFG cfg, const char* path);
+bool write_cfg_dot(const Ast& ast, const CFG& cfg, const char* path);
 
 std::string dump_cfg_as_text(CFG cfg);
 

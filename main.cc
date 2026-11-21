@@ -36,8 +36,6 @@ int main() {
 
     std::cout << "after parsing dump" << std::endl;
 
-    Arena* mem_arena = arena_create(1000000);
-    cfg_set_arena(mem_arena);
     CFG cfg = get_cfg(program);
 
     std::string cfg_text = cfg_dump_as_text(*program.ast, cfg);
@@ -45,7 +43,7 @@ int main() {
     std::cout << "===============\n\n" << std::endl;
     std::cout << cfg_text << std::endl;
 
-    // bool done = write_cfg_dot(*program.ast, cfg, "out.dot");
+    bool done = write_cfg_dot(*program.ast, cfg, "out.dot");
 
     // auto fixpoint_result = fixpoint_analyze<NonRelational<Interval>>(cfg);
     //

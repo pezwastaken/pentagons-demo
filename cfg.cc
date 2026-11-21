@@ -1,7 +1,6 @@
 #include <iostream>
 #include <set>
 
-static Arena* mem_arena = nullptr;
 static u32 id_tracker = 0U;
 
 struct ConstructionResult {
@@ -9,11 +8,8 @@ struct ConstructionResult {
     CfgNodeId out;
 };
 
-void cfg_set_arena(Arena *arena) {
-    mem_arena = arena;
-}
-
-CfgNodeId inner_get_cfg(CFG& cfg, Program& program, usize from, usize to);
+static ConstructionResult inner_get_cfg(CFG& cfg, const std::vector<StmtId>& stmt_list, Program& program);
+ConstructionResult inner_get_cfg(CFG& cfg, Program& program);
 
 inline ConstructionResult make_assign_node(CFG& cfg, const Stmt& s) {
     Node node {};
@@ -105,20 +101,17 @@ inline ConstructionResult make_block_node(CFG& cfg, Program& program, const Stmt
 
     assert(s.kind == BLOCK_STMT);
 
-    usize upto = s.as.block.first.id + s.as.block.count;
-    CfgNodeId root = inner_get_cfg(cfg, program, s.as.block.first.id, upto);
+    // usize upto = s.as.block.first.id + s.as.block.count;
+    //
+    // CfgNodeId cursor = root;
+    // while (cfg[cursor].true_edge.valid()) {
+    //     cursor = cfg[cursor].true_edge;
+    // }
 
-    CfgNodeId cursor = root;
-    while (cfg[cursor].false_edge.valid()) {
-        cursor = cfg[cursor].false_edge;
-    }
-
-    ConstructionResult r = ConstructionResult {root, cursor};
-    return r;
+    return inner_get_cfg(cfg, s.children, program);
 }
 
 ExprId expr_negate(Ast& ast, const Expr& e) {
-    assert(mem_arena);
     assert(e.kind == BINARY_EXPR); // TODO: could be unary too but whatever
 
     Expr negated {};
@@ -223,17 +216,17 @@ inline ConstructionResult make_while(CFG& cfg, Program& program, const Stmt& s) 
     return r;
 }
 
-CfgNodeId inner_get_cfg(CFG& cfg, Program& program, usize from, usize to) {
+static ConstructionResult inner_get_cfg(CFG& cfg, const std::vector<StmtId>& stmt_list, Program& program) {
+
     CfgNodeId root = make_nop(cfg).root;
     CfgNodeId prev = root;
 
     ConstructionResult r;
 
-    for (usize i = from; i < to; ++i) {
-
-        StmtId s_id = program.inner[i];
+    for (StmtId s_id : stmt_list) {
 
         assert(s_id.valid());
+
         const auto& s = (*program.ast)[s_id];
 
         switch (s.kind) {
@@ -256,19 +249,25 @@ CfgNodeId inner_get_cfg(CFG& cfg, Program& program, usize from, usize to) {
 
     assert (cfg[root].stmt.kind == CFG_NOP);
     assert (root.valid());
+    assert (prev.valid());
 
     if (cfg[root].true_edge.valid()) {
         assert (cfg[root].true_edge.valid());
-        return cfg[root].true_edge;
+        return ConstructionResult {.root = cfg[root].true_edge, .out = prev};
     }
 
-    return root;
+    return ConstructionResult {.root = root, .out = prev };
+
+}
+
+ConstructionResult inner_get_cfg(CFG& cfg, Program& program) {
+    return inner_get_cfg(cfg, program.inner, program);
 }
 
 CFG get_cfg(Program& program) {
 
     CFG cfg {};
-    CfgNodeId root = inner_get_cfg(cfg, program, 0U, program.inner.size());
+    CfgNodeId root = inner_get_cfg(cfg, program).root;
     cfg.root = root;
     return cfg;
 }
@@ -294,7 +293,7 @@ static std::string label(const Ast& ast, const CFGStmt& s, usize id) {
 }
 
 
-bool write_cfg_dot(const Ast& ast, CFG cfg, const char* path) {
+bool write_cfg_dot(const Ast& ast, const CFG& cfg, const char* path) {
     FILE* f = fopen(path, "w");
     if (!f) return false;
 
@@ -313,10 +312,10 @@ bool write_cfg_dot(const Ast& ast, CFG cfg, const char* path) {
         bool branch = cfg[n].true_edge.valid() && cfg[n].false_edge.valid();
         fprintf(f, "  n%p [label=\"%s\"];\n", (const void*)(&cfg.nodes[n.id]), label(ast, cfg[n].stmt, cfg[n].id).c_str());
         if (cfg[n].true_edge.valid())
-            fprintf(f, "  n%p -> n%p%s;\n", (const void*)(&cfg.nodes[n.id]), (const void*)(&cfg.nodes[n.id].true_edge),
+            fprintf(f, "  n%p -> n%p%s;\n", (const void*)(&cfg.nodes[n.id]), (const void*)(&cfg.nodes[cfg[n].true_edge.id]),
                     branch ? " [label=\"T\"]" : "");
         if (cfg[n].false_edge.valid())
-            fprintf(f, "  n%p -> n%p%s;\n", (const void*)(&cfg.nodes[n.id]), (const void*)(&cfg.nodes[n.id].false_edge),
+            fprintf(f, "  n%p -> n%p%s;\n", (const void*)(&cfg.nodes[n.id]), (const void*)(&cfg.nodes[cfg[n].false_edge.id]),
                     branch ? " [label=\"F\"]" : "");
 
         todo.push_back(cfg[n].true_edge);

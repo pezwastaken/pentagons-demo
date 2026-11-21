@@ -1,3 +1,4 @@
+#include "parser.hh"
 #include <iostream>
 #include <optional>
 
@@ -131,8 +132,8 @@ static inline ExprId make_binary (Parser& parser, Token op_token, BinaryOperator
     e.token = op_token;
     e.bin_op = op;
     e.type = INT;
-    e.left = ExprId();
-    e.right = ExprId();
+    e.left = left;
+    e.right = right;
 
     return parser.ast.add(e);
 }
@@ -339,7 +340,8 @@ static inline StmtId parse_var_decl(Parser& parser) {
     s.as.decl.expr = init;
     s.as.decl.name = name;
 
-    return parser.ast.add(s);
+    StmtId res = parser.ast.add(s);
+    return res;
 }
 
 static inline StmtId parse_assignment_or_expr(Parser& parser) {
@@ -394,7 +396,8 @@ static inline StmtId parse_if(Parser& p) {
     if_stmt.as.if_stmt.then_branch = then_body;
     if_stmt.as.if_stmt.else_branch = else_body;
 
-    return p.ast.add(if_stmt);
+    StmtId res = p.ast.add(if_stmt);
+    return res;
 }
 
 static inline StmtId parse_assert(Parser& p) {
@@ -412,7 +415,8 @@ static inline StmtId parse_assert(Parser& p) {
 
     if (!match(p, SEMICOLON)) return StmtId {};
 
-    return p.ast.add(assert_stmt);
+    StmtId res = p.ast.add(assert_stmt);
+    return res;
 }
 
 static inline StmtId parse_while(Parser& p) {
@@ -431,7 +435,8 @@ static inline StmtId parse_while(Parser& p) {
     while_stmt.as.while_stmt.guard = guard;
     while_stmt.as.while_stmt.then_branch = then_body;
 
-    return p.ast.add(while_stmt);
+    StmtId res = p.ast.add(while_stmt);
+    return res;
 }
 
 static inline StmtId parse_block(Parser& p) {
@@ -439,28 +444,19 @@ static inline StmtId parse_block(Parser& p) {
     Token kw = advance(p);
     assert(kw.type == LEFT_BRACE);
 
-    Stmt block (BLOCK_STMT, kw);
-    StmtId block_id = p.ast.add(block);
+    Stmt block_stmt (BLOCK_STMT, kw);
 
-    const usize first = p.ast.stmts.size();
-    assert(block_id.id + 1U == first);
+    std::vector<StmtId> children;
 
-    StmtId last {};
     while (!check_eq(p, RIGHT_BRACE) && more(p)) {
-        last = parse_statement(p);
+        StmtId last = parse_statement(p);
+        children.push_back(last);
     }
-
-    const usize count = last.id - first + 1;
 
     if (!match(p, RIGHT_BRACE)) p.errors.push_back({"expected right brace closing block"});
 
-    p.ast.stmts[block_id.id].as.block.first = StmtId {.id = first};
-    p.ast.stmts[block_id.id].as.block.count = count;
-
-    std::cout << "parsing block: first is " << p.ast.stmts[block_id.id].as.block.first.id << " and count is "
-        << p.ast.stmts[block_id.id].as.block.count << std::endl;
-
-    return block_id;
+    block_stmt.children = children;
+    return p.ast.add(block_stmt);
 }
 
 static inline StmtId parse_return(Parser& p) {
@@ -474,8 +470,10 @@ static inline StmtId parse_return(Parser& p) {
 
     Stmt ret_stmt (RET_STMT, kw);
     ret_stmt.as.ret_stmt.expr = expr;
+    assert (ret_stmt.as.ret_stmt.expr.valid());
 
-    return p.ast.add(ret_stmt);
+    StmtId res = p.ast.add(ret_stmt);
+    return res;
 }
 
 static inline StmtId parse_statement(Parser& p) {
@@ -504,7 +502,7 @@ Program parse_program(Parser& p, std::vector<ParseError> errors) {
     std::vector<StmtId> res;
 
     while (more(p)) {
-        StmtId s = parse_statement(p);
+        auto s = parse_statement(p);
         res.push_back(s);
     }
 
@@ -536,34 +534,31 @@ std::string dump_stmt(const Ast& ast, StmtId s_id) {
     case ASSERT_STMT:
         return ("assert (" + dump_expr(ast, s.as.expr.expr) + ")");
     case RET_STMT:
+        assert (s.as.ret_stmt.expr.valid());
         return ("return " + dump_expr(ast, s.as.ret_stmt.expr));
     case IF_STMT: {
-        ++indent_count;
         auto res = "if " + dump_expr(ast, s.as.if_stmt.guard)
-            + dump_stmt(ast, s.as.if_stmt.then_branch) + " else " +
-            (s.as.if_stmt.else_branch.valid() ? dump_stmt(ast, s.as.if_stmt.else_branch) : "");
-        --indent_count;
+            + dump_stmt(ast, s.as.if_stmt.then_branch) + "else " +
+            (s.as.if_stmt.else_branch.valid() ? dump_stmt(ast, s.as.if_stmt.else_branch) : "{ }");
         return res;
     }
     case WHILE_STMT: {
-        ++indent_count;
         auto res = "while " + dump_expr(ast, s.as.while_stmt.guard)
             + dump_stmt(ast, s.as.while_stmt.then_branch);
-        --indent_count;
         return res;
     }
     case BLOCK_STMT:
         {
-            std::string res = "{\n";
-            StmtId first = s.as.block.first;
-
+            std::string res = with_indent(indent_count) + "{\n";
             ++indent_count;
 
-            for (usize i = first.id; i < first.id + s.as.block.count; ++i) {
-                std::cout << "accessing element " << i << std::endl;
-                res += with_indent(indent_count) + dump_stmt(ast, StmtId {.id = i}) + "\n";
+            for (StmtId s_id_children : s.children) {
+                res += dump_stmt(ast, s_id_children);
             }
-            return res + "\n" + with_indent(--indent_count) + "}\n";
+
+            --indent_count;
+            res += with_indent(indent_count) + "\n}\n";
+            return res;
         }
     default:
         UNREACHABLE;
