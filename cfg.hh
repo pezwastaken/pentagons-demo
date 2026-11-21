@@ -23,27 +23,49 @@ struct CFGStmt {
 
     ExprId expr; // expressions and guards
 
-    CFGStmtKind kind;
+    CFGStmtKind kind = CFG_NOP;
+};
 
-    explicit CFGStmt(CFGStmtKind k = CFG_NOP) : kind(k) {
+struct CfgNodeId {
+    usize id = SIZE_MAX;
 
+    bool valid() const {
+        return id != SIZE_MAX;
     }
+
+    bool operator<(const CfgNodeId& other) const {
+        return id < other.id;
+    }
+
 };
 
 struct Node {
     CFGStmt stmt;
 
-    Node* true_edge = nullptr;
-    Node* false_edge = nullptr;
+    CfgNodeId true_edge;
+    CfgNodeId false_edge;
 
     SyntheticPP pp;
 
     usize id;
-
 };
 
 struct CFG {
-    Node* root;
+
+    std::vector<Node> nodes;
+
+    CfgNodeId add(const Node& n) {
+        nodes.push_back(n);
+        return {nodes.size() - 1};
+    }
+
+    const Node& operator[](CfgNodeId id) const {
+        assert(id.valid());
+        assert(id.id < nodes.size());
+        return nodes[id.id];
+    }
+
+    CfgNodeId root;
 };
 
 
