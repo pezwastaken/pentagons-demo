@@ -2,7 +2,7 @@
 
 #include <climits>
 #include <iostream>
-#include <unordered_map>
+#include <map>
 
 enum AbstractElementKind {
     BOT,
@@ -49,11 +49,11 @@ struct NonRelational {
 
     struct State {
         AbstractElementKind kind = BOT;
-        std::unordered_map<std::string, V> env;
+        std::map<std::string, V> env;
         bool reachable = true;
     };
 
-    static V eval(State& s, const Expr& e) {
+    static V eval(const CFG& cfg, State& s, const Expr& e) {
         switch (e.kind) {
         case LITERAL_EXPR:
             return V::constant(e.token.literal.value.int_value);
@@ -67,17 +67,17 @@ struct NonRelational {
                 return s.env[std::string(e.token.lexeme)];
             }
         case UNARY_EXPR:
-            return V::unary(e, eval(s, *e.left));
+            return V::unary(e, eval(cfg, s, cfg[e.left]));
         case BINARY_EXPR:
             {
-                V eval_left = eval(s, *e.left);
-                V eval_right = eval(s, *e.right);
+                V eval_left = eval(cfg, s, cfg[e.left]);
+                V eval_right = eval(cfg, s, cfg[e.right]);
                 return V::binary(e, eval_left, eval_right);
             }
         case INPUT_EXPR:
             {
-                V eval_left = eval(s, *e.left);
-                V eval_right = eval(s, *e.right);
+                V eval_left = eval(cfg, s, cfg[e.left]);
+                V eval_right = eval(cfg, s, cfg[e.right]);
                 return V::input_with_bounds(eval_left, eval_right);
             }
         default:
@@ -85,8 +85,8 @@ struct NonRelational {
         }
     }
 
-    static State assign(State s, const std::string& name, const Expr& e) {
-        V value = eval(s, e);
+    static State assign(const CFG& cfg, State s, const std::string& name, const Expr& e) {
+        V value = eval(cfg, s, e);
 
         if (!V::is_bottom(value)) {
             s.kind = SOME;
@@ -129,26 +129,26 @@ struct NonRelational {
         return s;
     }
 
-    static State assume(State s, const Expr& e) {
+    static State assume(const CFG& cfg, State s, const Expr& e) {
 
         if (e.kind != BINARY_EXPR)
             return bot_state();
 
-        return inner_assume(s, e);
+        return inner_assume(cfg, s, e);
     }
 
-    static State inner_assume(State s, const Expr& e) {
+    static State inner_assume(const CFG& cfg, State s, const Expr& e) {
 
-        if (e.left->kind == VARIABLE_EXPR) {
-            V left_value = eval(s, *e.left);
-            V right_value = eval(s, *e.right);
+        if (cfg[e.left].kind == VARIABLE_EXPR) {
+            V left_value = eval(cfg, s, cfg[e.left]);
+            V right_value = eval(cfg, s, cfg[e.right]);
 
             V filtered = V::filter(e.bin_op, left_value, right_value);
             if (V::is_bottom(filtered)) {
                 return bot_state();
             }
 
-            return set(s, std::string(e.left->token.lexeme), filtered);
+            return set(s, std::string(cfg[e.left].token.lexeme), filtered);
         }
 
         return s;
@@ -243,9 +243,9 @@ struct NonRelational {
 };
 
 template <class D>
-concept StateDomain = requires(D::State s, const std::string& x, const Expr& e) {
+concept StateDomain = requires(const CFG& cfg, D::State s, const std::string& x, const Expr& e) {
 
-    { D::assign(s, x, e) } -> std::same_as<typename D::State>;
+    { D::assign(cfg, s, x, e) } -> std::same_as<typename D::State>;
     { D::top_state() } -> std::same_as<typename D::State>;
     { D::bot_state() } -> std::same_as<typename D::State>;
     { D::dump_state(s) } -> std::same_as<std::string>;
@@ -259,7 +259,7 @@ concept StateDomain = requires(D::State s, const std::string& x, const Expr& e) 
     // { D::eval(s, e) } -> std::same_as<typename D::State>;
     // TODO: this should return a tuple <abstract value, abstract state> (function calls with side effects)
 
-    { D::assume(s, e) } -> std::same_as<typename D::State>;
+    { D::assume(cfg, s, e) } -> std::same_as<typename D::State>;
     { D::widening(s, s) } -> std::same_as<typename D::State>;
 
 };
@@ -267,8 +267,8 @@ concept StateDomain = requires(D::State s, const std::string& x, const Expr& e) 
 
 template <StateDomain D>
 struct FixpointResult {
-    std::unordered_map<Node*, typename D::State> node_states;
-    std::unordered_map<Node*, Satisfiability> asserts_sat;
+    std::map<CfgNodeId, typename D::State> node_states;
+    std::map<CfgNodeId, Satisfiability> asserts_sat;
 };
 
 

@@ -103,7 +103,7 @@ struct Interval {
 
     static Interval meet(Interval a, Interval b) {
         if (a.kind == BOT || b.kind == BOT)
-            return Interval {.kind = SOME};
+            return bottom();
 
         if (a.kind == TOP)
             return b;
@@ -119,6 +119,8 @@ struct Interval {
     }
 
     static Interval widening(Interval a, Interval b) {
+        (void) a;
+        (void) b;
         return top();
     }
 

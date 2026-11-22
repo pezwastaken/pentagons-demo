@@ -43,9 +43,13 @@ int main() {
     std::cout << "===============\n\n" << std::endl;
     std::cout << cfg_text << std::endl;
 
-    bool done = write_cfg_dot(*program.ast, cfg, "out.dot");
+    // bool done = write_cfg_dot(*program.ast, cfg, "out.dot");
+    // if (!done) {
+    //     std::cerr << "
+    // }
 
     auto fixpoint_result = fixpoint_analyze<NonRelational<Interval>>(cfg);
+    (void) fixpoint_result;
 
     // std::cout << "have results for " << fixpoint_result.asserts_sat.size() << " asserts" << std::endl;
     //

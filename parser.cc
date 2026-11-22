@@ -506,6 +506,10 @@ ParsedProgram parse_program(Parser& p, std::vector<ParseError> errors) {
         res.push_back(s);
     }
 
+    for (const ParseError& error : errors) {
+        std::cerr << "PARSE ERROR: " << error.inner << std::endl;
+    }
+
     return ParsedProgram {.inner = res, .ast = &p.ast};
 }
 

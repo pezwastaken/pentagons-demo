@@ -1,21 +1,20 @@
 #pragma once
 
 #include <deque>
-#include <unordered_map>
 #include <utility>
 #include <map>
 
 static constexpr u32 WIDENING_THRESHOLD = 20U;
 
 template <StateDomain D>
-typename D::State transfer_declaration(const CFG& cfg, typename D::State& entry_state, Node* n) {
+typename D::State transfer_declaration(const CFG& cfg, typename D::State& entry_state, const Node& n) {
 
-    assert(n->stmt.kind == CFG_DECLARATION);
+    assert(n.stmt.kind == CFG_DECLARATION);
 
-    std::string declaring_name = std::string(n->stmt.name.lexeme);
+    std::string declaring_name = std::string(n.stmt.name.lexeme);
     assert(declaring_name != "");
 
-    typename D::State out = D::assign(entry_state, declaring_name, cfg[n->stmt.rhs]);
+    typename D::State out = D::assign(cfg, entry_state, declaring_name, cfg[n.stmt.rhs]);
 
 
 #ifndef NDEBUG
@@ -29,14 +28,14 @@ typename D::State transfer_declaration(const CFG& cfg, typename D::State& entry_
 }
 
 template <StateDomain D>
-typename D::State transfer_assign(const CFG& cfg, typename D::State& entry_state, Node* n) {
+typename D::State transfer_assign(const CFG& cfg, typename D::State& entry_state, const Node& n) {
 
-    assert(n->stmt.kind == CFG_ASSIGNMENT);
+    assert(n.stmt.kind == CFG_ASSIGNMENT);
 
-    std::string declaring_name = std::string(cfg[n->stmt.lhs].token.lexeme);
+    std::string declaring_name = std::string(cfg[n.stmt.lhs].token.lexeme);
     assert(declaring_name != "");
 
-    typename D::State out = D::assign(entry_state, declaring_name, cfg[n->stmt.rhs]);
+    typename D::State out = D::assign(cfg, entry_state, declaring_name, cfg[n.stmt.rhs]);
 
     assert(!out.env.empty());
     return out;
@@ -62,10 +61,7 @@ struct TransferInfo {
 template <StateDomain D>
 typename D::State transfer_assert(const CFG& cfg, typename D::State& entry_state, const Expr& e, TransferInfo& assert_info) {
 
-    auto ok = transfer_assume<D>(entry_state, e);
-
-    // TODO: expr negate should just return the expression via move. Then one can decide whether
-    // to allocate or not
+    auto ok = transfer_assume<D>(cfg, entry_state, e);
 
     const Expr negated = expr_negate(e);
     auto bad = transfer_assume<D>(cfg, entry_state, negated);
@@ -84,10 +80,11 @@ typename D::State transfer_assert(const CFG& cfg, typename D::State& entry_state
 }
 
 template <StateDomain D>
-typename D::State transfer(const CFG& cfg, typename D::State entry_state, Node* n, FixpointResult<D>& result) {
+typename D::State transfer(const CFG& cfg, typename D::State entry_state, CfgNodeId node_id, FixpointResult<D>& result) {
 
+    const Node& n = cfg[node_id];
 
-    switch (n->stmt.kind) {
+    switch (n.stmt.kind) {
     case CFG_DECLARATION:
         return transfer_declaration<D>(cfg, entry_state, n);
     case CFG_ASSIGNMENT:
@@ -95,8 +92,8 @@ typename D::State transfer(const CFG& cfg, typename D::State entry_state, Node* 
     case CFG_ASSERT:
         {
             TransferInfo t {.is_assert_sat = SAT_UNKNOWN };
-            typename D::State res_state = transfer_assert<D>(cfg, entry_state, cfg[n->stmt.expr], t);
-            result.asserts_sat[n] = t.is_assert_sat;
+            typename D::State res_state = transfer_assert<D>(cfg, entry_state, cfg[n.stmt.expr], t);
+            result.asserts_sat[node_id] = t.is_assert_sat;
             return res_state;
         }
     case CFG_EXPR_GUARD:
@@ -119,17 +116,17 @@ struct SplitState {
 };
 
 template <StateDomain D>
-SplitState<D> transfer_split(const CFG& cfg, typename D::State entry_state, Node* n) {
-    assert(n->stmt.kind == CFG_EXPR_GUARD);
+SplitState<D> transfer_split(const CFG& cfg, typename D::State entry_state, CfgNodeId n) {
+    assert(cfg[n].stmt.kind == CFG_EXPR_GUARD);
 
-    assert(n->true_edge.valid());
-    assert(n->false_edge.valid());
+    assert(cfg[n].true_edge.valid());
+    assert(cfg[n].false_edge.valid());
 
-    assert(n->stmt.lhs.valid());
-    assert(n->stmt.rhs.valid());
+    assert(cfg[n].stmt.lhs.valid());
+    assert(cfg[n].stmt.rhs.valid());
 
-    typename D::State true_state = transfer_assume<D>(cfg, entry_state, cfg[n->stmt.lhs]);
-    typename D::State false_state = transfer_assume<D>(cfg, entry_state, cfg[n->stmt.rhs]);
+    typename D::State true_state = transfer_assume<D>(cfg, entry_state, cfg[cfg[n].stmt.lhs]);
+    typename D::State false_state = transfer_assume<D>(cfg, entry_state, cfg[cfg[n].stmt.rhs]);
 
     return SplitState<D> {.true_state = true_state, .false_state = false_state};
 }
@@ -138,35 +135,36 @@ template <StateDomain D>
 std::pair<typename D::State, bool> fixpoint_propagate(
         const CFG& cfg,
         const typename D::State& entry_state,
-        Node* src,
-        Node* dst,
-        std::unordered_map<Node*, typename D::State>& node_states,
-        std::unordered_map<Node*, u32>& iter_counter,
-        FixpointResult<D>& fixpoint_result) {
+        CfgNodeId dst_id,
+        std::map<CfgNodeId, typename D::State>& node_states,
+        std::map<CfgNodeId, u32>& iter_counter) {
 
     using S = typename D::State;
-    S out_state = transfer(cfg, entry_state, src, fixpoint_result);
 
-    S prev = node_states[dst];
-    S joined = D::join(out_state, prev);
+    // const Node& src = cfg[src_id];
+    const Node& dst = cfg[dst_id];
+    // S out_state = transfer(cfg, entry_state, src_id, fixpoint_result);
+
+    S prev = node_states[dst_id];
+    S joined = D::join(entry_state, prev);
 
     bool should_reque_node = false;
 
     // it's a guard, may have to widen
-    if (dst->stmt.kind == CFG_EXPR_GUARD) {
+    if (dst.stmt.kind == CFG_EXPR_GUARD) {
 
-        if (!iter_counter.contains(dst)) {
-            iter_counter[dst] = 0U;
+        if (!iter_counter.contains(dst_id)) {
+            iter_counter[dst_id] = 0U;
         }
-        else if (iter_counter[dst] >= WIDENING_THRESHOLD){
+        else if (iter_counter[dst_id] >= WIDENING_THRESHOLD){
             std::cout << "triggering widening" << std::endl;
             joined = D::widening(prev, joined);
         }
-        ++iter_counter[dst];
+        ++iter_counter[dst_id];
     }
 
     if (!D::leq(joined, prev)) {
-        node_states[dst] = joined;
+        node_states[dst_id] = joined;
         should_reque_node = true;
     }
 
@@ -178,8 +176,8 @@ FixpointResult<D> fixpoint_analyze(const CFG& cfg) {
 
     using S = typename D::State;
 
-    FixpointResult<D> result;
-    std::unordered_map<CfgNodeId, S>& node_states = result.node_states;
+    FixpointResult<D> result {};
+    std::map<CfgNodeId, S>& node_states = result.node_states;
     std::map<CfgNodeId, u32> iter_counter {};
 
     CfgNodeId root = cfg.root;
@@ -203,12 +201,9 @@ FixpointResult<D> fixpoint_analyze(const CFG& cfg) {
             if (node.true_edge.valid()) {
 
                 CfgNodeId dst_id = node.true_edge;
-                S prev = node_states[dst_id];
-
-                const Node& dst = cfg[dst_id];
 
                 std::pair<S, bool> out =
-                    fixpoint_propagate<D>(entry_state, x, dst, node_states, iter_counter, result);
+                    fixpoint_propagate<D>(cfg, out_state, dst_id, node_states, iter_counter, result);
 
                 if (out.second) {
                     que.push_back(dst_id);
@@ -217,18 +212,15 @@ FixpointResult<D> fixpoint_analyze(const CFG& cfg) {
         }
         else {
 
-            SplitState<D> split_state = transfer_split<D>(entry_state, x);
+            SplitState<D> split_state = transfer_split<D>(cfg, entry_state, x);
 
             // state transfer along the true edge
             if (node.true_edge.valid()) {
 
                 CfgNodeId dst_id = node.true_edge;
-                S prev = node_states[dst_id];
-
-                const Node& dst = cfg[dst_id];
 
                 std::pair<S, bool> out =
-                    fixpoint_propagate<D>(entry_state, x, dst, node_states, iter_counter, result);
+                    fixpoint_propagate<D>(cfg, split_state.true_state, dst_id, node_states, iter_counter, result);
 
                 if (out.second) {
                     que.push_back(dst_id);
@@ -239,12 +231,9 @@ FixpointResult<D> fixpoint_analyze(const CFG& cfg) {
             if (node.false_edge.valid()) {
 
                 CfgNodeId dst_id = node.false_edge;
-                S prev = node_states[dst_id];
-
-                const Node& dst = cfg[dst_id];
 
                 std::pair<S, bool> out =
-                    fixpoint_propagate<D>(entry_state, x, dst, node_states, iter_counter, result);
+                    fixpoint_propagate<D>(cfg, split_state.false_state, dst_id, node_states, iter_counter, result);
 
                 if (out.second) {
                     que.push_back(dst_id);
@@ -254,7 +243,7 @@ FixpointResult<D> fixpoint_analyze(const CFG& cfg) {
     }
 
     for (const auto& [id, state] : node_states) {
-        std::cout << "state for node id: " << id << D::dump_state(node_states[id])
+        std::cout << "state for node id: " << id.id << D::dump_state(node_states[id])
             << std::endl;
     }
 

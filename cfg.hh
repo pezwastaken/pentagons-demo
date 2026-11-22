@@ -65,11 +65,11 @@ struct CFG {
         return nodes[id.id];
     }
 
-    const Expr operator[](ExprId id) const {
+    const Expr& operator[](ExprId id) const {
         return (*parsed_program.ast)[id];
     }
 
-    const Stmt operator[](StmtId id) const {
+    const Stmt& operator[](StmtId id) const {
         return (*parsed_program.ast)[id];
     }
 

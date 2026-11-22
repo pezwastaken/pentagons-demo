@@ -258,7 +258,7 @@ ConstructionResult inner_get_cfg(CFG& cfg, ParsedProgram& program) {
 
 CFG get_cfg(ParsedProgram& program) {
 
-    CFG cfg {.parsed_program = program};
+    CFG cfg {.nodes = {}, .root = {}, .parsed_program = program};
     CfgNodeId root = inner_get_cfg(cfg, program).root;
     cfg.root = root;
     return cfg;
