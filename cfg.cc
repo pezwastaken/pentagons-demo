@@ -186,6 +186,9 @@ inline ConstructionResult make_while(CFG& cfg, ParsedProgram& program, const Stm
     Node node {};
     node.stmt.kind = CFG_EXPR_GUARD;
     node.stmt.expr = s.as.while_stmt.guard;
+    node.stmt.lhs = s.as.while_stmt.guard;
+    Expr negated = expr_negate(ast[s.as.while_stmt.guard]);
+    node.stmt.rhs = ast.add(negated);
     node.id = id_tracker;
     node.pp = SyntheticPP {id_tracker++};
 
