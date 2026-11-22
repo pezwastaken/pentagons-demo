@@ -21,6 +21,15 @@ enum Satisfiability {
     SAT_BOT,
 };
 
+[[gnu::pure]]
+[[nodiscard]]
+inline Satisfiability sat_negate(Satisfiability x) {
+    if (x == SAT_BOT) return SAT_BOT;
+    if (x == SAT_SAT) return SAT_UNSAT;
+    if (x == SAT_UNSAT) return SAT_SAT;
+    return SAT_UNKNOWN;
+}
+
 
 template <class V>
 concept ValueDomain = requires (V a, V b, isize n, const Expr& unary, const Expr& binary,

@@ -77,11 +77,13 @@ struct Interval {
         case OP_BINARY_NE:
             return interval_ne(a, b);
         case OP_BINARY_LT:
-            return Satisfiability::SAT_UNKNOWN; // TODO
+            return interval_lt(a, b);
         case OP_BINARY_LE:
             return interval_le(a, b);
         case OP_BINARY_GT:
+            return interval_gt(a, b);
         case OP_BINARY_GE:
+            return interval_ge(a, b);
         default:
             return Satisfiability::SAT_UNKNOWN;
         }
@@ -138,26 +140,56 @@ struct Interval {
 
     static Interval filter(BinaryOperatorKind op, Interval a, Interval b) {
         switch (op) {
-        case OP_BINARY_EQ:
-            {
-                if (b.kind == TOP)
-                    return top();
-                Interval glb = Interval::meet(a, b);
-                return glb;
-            }
-        case OP_BINARY_NE:
-            {
-                if (b.kind == TOP)
-                    return top();
-                Interval glb = Interval::meet(a, b);
-                if (Interval::equal_check(a, glb))
-                    return bottom();
-                return a;
-            }
-        case OP_BINARY_LT:
-        case OP_BINARY_LE:
-        case OP_BINARY_GT:
-        case OP_BINARY_GE:
+        case OP_BINARY_EQ: {
+            Interval glb = Interval::meet(a, b);
+            return glb;
+        }
+        case OP_BINARY_NE: {
+            if (b.kind == TOP)
+                return top();
+            Interval glb = Interval::meet(a, b);
+            if (Interval::equal_check(a, glb))
+                return bottom();
+            return a;
+        }
+        case OP_BINARY_LT: {
+            if (b.kind == TOP)
+                return top();
+
+            Interval tmp {.kind = SOME, .low = a.low, .high = b.high - 1};
+            if (!valid(tmp))
+                return bottom();
+            return meet(a, tmp);
+        }
+        case OP_BINARY_LE: {
+            if (b.kind == TOP)
+                return top();
+
+            Interval tmp {.kind = SOME, .low = a.low, .high = b.high};
+            if (!valid(tmp))
+                return bottom();
+            return meet(a, tmp);
+        }
+        case OP_BINARY_GT: {
+            if (b.kind == TOP)
+                return top();
+
+            Interval tmp {.kind = SOME, .low = b.low + 1, .high = a.high};
+            if (!valid(tmp))
+                return bottom();
+
+            return meet(a, tmp);
+        }
+        case OP_BINARY_GE: {
+            if (b.kind == TOP)
+                return top();
+
+            Interval tmp {.kind = SOME, .low = b.low, .high = a.high};
+            if (!valid(tmp))
+                return bottom();
+
+            return meet(a, tmp);
+        }
         case OP_BINARY_LOG_AND:
         case OP_BINARY_LOG_OR:
         default: return a;
@@ -255,10 +287,36 @@ private:
         return Satisfiability::SAT_UNKNOWN;
     }
 
+    static Satisfiability interval_lt(Interval a, Interval b) {
+        if (is_bottom(a) || is_bottom(b))
+            return Satisfiability::SAT_BOT;
+
+        if (a.high < b.low) {
+            return Satisfiability::SAT_SAT;
+        }
+
+        if (a.low > b.high) {
+            return Satisfiability::SAT_UNSAT;
+        }
+
+        return Satisfiability::SAT_UNKNOWN;
+    }
+
+    static Satisfiability interval_gt(Interval a, Interval b) {
+        return sat_negate(interval_le(a, b));
+    }
+
+    static Satisfiability interval_ge(Interval a, Interval b) {
+        return sat_negate(interval_lt(a, b));
+    }
+
     static bool equal_check(Interval a, Interval b) {
         return a.low == b.low && a.high == b.high;
     }
 
+    static bool valid(Interval a) {
+        return a.low <= a.high;
+    }
 };
 
 static_assert(ValueDomain<Interval>);
