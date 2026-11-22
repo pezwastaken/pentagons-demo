@@ -53,6 +53,28 @@ concept ValueDomain = requires (V a, V b, isize n, const Expr& unary, const Expr
 };
 
 
+template <class D>
+concept StateDomain = requires(const CFG& cfg, D::State s, const std::string& x, const Expr& e) {
+
+    { D::assign(cfg, s, x, e) } -> std::same_as<typename D::State>;
+    { D::top_state() } -> std::same_as<typename D::State>;
+    { D::bot_state() } -> std::same_as<typename D::State>;
+    { D::dump_state(s) } -> std::same_as<std::string>;
+    { D::is_bottom(s) } -> std::same_as<bool>;
+    { D::is_top(s) } -> std::same_as<bool>;
+    { D::join(s, s) } -> std::same_as<typename D::State>;
+    { D::leq(s, s) } -> std::same_as<bool>;
+
+    { D::is_reachable(s) } -> std::same_as<bool>;
+
+    // { D::eval(s, e) } -> std::same_as<typename D::State>;
+    // TODO: this should return a tuple <abstract value, abstract state> (function calls with side effects)
+
+    { D::assume(cfg, s, e) } -> std::same_as<typename D::State>;
+    { D::widening(s, s) } -> std::same_as<typename D::State>;
+
+};
+
 template <ValueDomain V>
 struct NonRelational {
 
@@ -248,28 +270,6 @@ struct NonRelational {
     static bool is_reachable(const State& s) {
         return s.reachable;
     }
-
-};
-
-template <class D>
-concept StateDomain = requires(const CFG& cfg, D::State s, const std::string& x, const Expr& e) {
-
-    { D::assign(cfg, s, x, e) } -> std::same_as<typename D::State>;
-    { D::top_state() } -> std::same_as<typename D::State>;
-    { D::bot_state() } -> std::same_as<typename D::State>;
-    { D::dump_state(s) } -> std::same_as<std::string>;
-    { D::is_bottom(s) } -> std::same_as<bool>;
-    { D::is_top(s) } -> std::same_as<bool>;
-    { D::join(s, s) } -> std::same_as<typename D::State>;
-    { D::leq(s, s) } -> std::same_as<bool>;
-
-    { D::is_reachable(s) } -> std::same_as<bool>;
-
-    // { D::eval(s, e) } -> std::same_as<typename D::State>;
-    // TODO: this should return a tuple <abstract value, abstract state> (function calls with side effects)
-
-    { D::assume(cfg, s, e) } -> std::same_as<typename D::State>;
-    { D::widening(s, s) } -> std::same_as<typename D::State>;
 
 };
 
