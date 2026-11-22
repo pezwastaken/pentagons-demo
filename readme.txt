@@ -1,8 +1,4 @@
-int b = 0;
 
-while (b < 100) {
-	b = b + 1;
-}
+abstract interpreter demo implementing the intervals domain on integer types, with widening.
 
-return 5;
 

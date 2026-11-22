@@ -7,7 +7,7 @@
 
 int main() {
 
-    std::string source = read_file("./readme.txt");
+    std::string source = read_file("./input.txt");
     std::cout << source << std::endl;
     std::cout << "-------end source-------" << std::endl;
 

@@ -141,9 +141,7 @@ std::pair<typename D::State, bool> fixpoint_propagate(
 
     using S = typename D::State;
 
-    // const Node& src = cfg[src_id];
     const Node& dst = cfg[dst_id];
-    // S out_state = transfer(cfg, entry_state, src_id, fixpoint_result);
 
     S prev = node_states[dst_id];
     S joined = D::join(entry_state, prev);
@@ -157,7 +155,6 @@ std::pair<typename D::State, bool> fixpoint_propagate(
             iter_counter[dst_id] = 0U;
         }
         else if (iter_counter[dst_id] >= WIDENING_THRESHOLD){
-            std::cout << "triggering widening" << std::endl;
             joined = D::widening(prev, joined);
         }
         ++iter_counter[dst_id];
