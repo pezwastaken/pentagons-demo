@@ -203,7 +203,7 @@ FixpointResult<D> fixpoint_analyze(const CFG& cfg) {
                 CfgNodeId dst_id = node.true_edge;
 
                 std::pair<S, bool> out =
-                    fixpoint_propagate<D>(cfg, out_state, dst_id, node_states, iter_counter, result);
+                    fixpoint_propagate<D>(cfg, out_state, dst_id, node_states, iter_counter);
 
                 if (out.second) {
                     que.push_back(dst_id);
@@ -220,7 +220,7 @@ FixpointResult<D> fixpoint_analyze(const CFG& cfg) {
                 CfgNodeId dst_id = node.true_edge;
 
                 std::pair<S, bool> out =
-                    fixpoint_propagate<D>(cfg, split_state.true_state, dst_id, node_states, iter_counter, result);
+                    fixpoint_propagate<D>(cfg, split_state.true_state, dst_id, node_states, iter_counter);
 
                 if (out.second) {
                     que.push_back(dst_id);
@@ -233,7 +233,7 @@ FixpointResult<D> fixpoint_analyze(const CFG& cfg) {
                 CfgNodeId dst_id = node.false_edge;
 
                 std::pair<S, bool> out =
-                    fixpoint_propagate<D>(cfg, split_state.false_state, dst_id, node_states, iter_counter, result);
+                    fixpoint_propagate<D>(cfg, split_state.false_state, dst_id, node_states, iter_counter);
 
                 if (out.second) {
                     que.push_back(dst_id);

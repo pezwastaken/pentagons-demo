@@ -76,13 +76,15 @@ bool html_dump_fixpoint(const CFG& cfg, const FixpointResult<D>& res) {
     fputs("<div class=\"sidebar\">\n", f);
     bool is_first = true;
 
-    std::map<Node*, S> ordered_nodes (res.node_states.begin(), res.node_states.end());
+    std::map<CfgNodeId, S> ordered_nodes (res.node_states.begin(), res.node_states.end());
 
-    for (const auto& [node, S] : ordered_nodes) {
+    for (const auto& [node_id, S] : ordered_nodes) {
+
+        const Node& node = cfg[node_id];
 
         std::string b = std::format(
             "  <button onclick=\"showSection('section{}')\" id=\"btn-section{}\" class=\"{}\">node {}</button>\n",
-            node->id, node->id, is_first ? "active" : "", node->id
+            node.id, node.id, is_first ? "active" : "", node.id
         );
         fputs(b.c_str(), f);
         is_first = false;
@@ -91,10 +93,13 @@ bool html_dump_fixpoint(const CFG& cfg, const FixpointResult<D>& res) {
 
     fputs("<div class=\"content-panel\">\n", f);
     is_first = true;
-    for (const auto& [node, s] : res.node_states) {
+    for (const auto& [node_id, s] : res.node_states) {
+
+        const Node& node = cfg[node_id];
+
         std::string div_head = std::format(
             "  <div id=\"section{}\" class=\"content-section {}\">\n",
-            node->id, is_first ? "active" : ""
+            node.id, is_first ? "active" : ""
         );
         fputs(div_head.c_str(), f);
 
@@ -102,7 +107,7 @@ bool html_dump_fixpoint(const CFG& cfg, const FixpointResult<D>& res) {
         if (D::is_reachable(s))
             reachability = "REACHABLE";
 
-        std::string content = "    <h2>Node " + std::to_string(node->id) + " " + reachability + "</h2>\n    <p>" + D::dump_state(s) + "</p>\n";
+        std::string content = "    <h2>Node " + std::to_string(node.id) + " " + reachability + "</h2>\n    <p>" + D::dump_state(s) + "</p>\n";
         fputs(content.c_str(), f);
 
         fputs("  </div>\n", f);
