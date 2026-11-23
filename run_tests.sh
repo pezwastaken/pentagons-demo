@@ -4,3 +4,4 @@ g++ -std=c++20 -fsanitize=undefined tests/tests.cc -o tests/run_tests -Wall -Wex
 
 echo "compiled"
 ./tests/run_tests
+
