@@ -99,7 +99,10 @@ struct SubDomain {
             else {
                 const Sub& s2_var_subs = s2.env.at(var);
                 Sub joined = sub_intersect(s1_var_subs, s2_var_subs);
-                res.env[var] = joined;
+
+                if (!joined.ub.empty()) {
+                    res.env[var] = joined;
+                }
             }
         }
         return res;

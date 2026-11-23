@@ -24,9 +24,9 @@ TEST_CASE("interval join", "[intervals]") {
  *
  */
 
-std::set<std::string_view> get_ub_for(const std::vector<std::string>& v) {
+std::set<std::string_view> get_ub_for(const std::vector<std::string_view>& v) {
     std::set<std::string_view> res {};
-    for (const auto& s : v) {
+    for (auto s : v) {
         res.insert(s);
     }
     return res;
@@ -84,5 +84,44 @@ TEST_CASE("ub bottom_some_join", "[strict upper bounds]") {
     REQUIRE(b.env["a"].ub == c.env["a"].ub);
 }
 
+
+TEST_CASE("ub_some_some_join", "[strict upper bounds]") {
+    SubDomain::State a = SubDomain::top_state();
+    SubDomain::State b = SubDomain::top_state();
+
+    SubDomain::Sub s1 {.ub = get_ub_for({"x", "y"})};
+    a.env.insert(std::make_pair("a", s1));
+
+    SubDomain::Sub s2 {.ub = get_ub_for({"x", "y", "z"})};
+    b.env.insert(std::make_pair("a", s2));
+
+    auto c = SubDomain::join(a, b);
+
+    REQUIRE(!c.env.empty());
+    REQUIRE(c.reachable);
+    REQUIRE(c.env.contains("a"));
+    REQUIRE(a.env["a"].ub == c.env["a"].ub);
+}
+
+TEST_CASE("ub_some_some_join_2", "[strict upper bounds]") {
+    SubDomain::State a = SubDomain::top_state();
+    SubDomain::State b = SubDomain::top_state();
+
+    SubDomain::Sub s1_1{.ub = get_ub_for({"x", "y"})};
+    SubDomain::Sub s1_2 {.ub = get_ub_for({"z"})};
+    a.env.insert(std::make_pair("a", s1_1));
+    a.env.insert(std::make_pair("b", s1_2));
+
+    SubDomain::Sub s2 {.ub = get_ub_for({"x", "y", "z"})};
+    b.env.insert(std::make_pair("a", s2));
+
+    auto c = SubDomain::join(a, b);
+
+    REQUIRE(!c.env.empty());
+    REQUIRE(c.reachable);
+    REQUIRE(c.env.contains("a"));
+    REQUIRE(a.env["a"].ub == c.env["a"].ub);
+    REQUIRE(!c.env.contains("b"));
+}
 
 
