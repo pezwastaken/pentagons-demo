@@ -125,3 +125,24 @@ TEST_CASE("ub_some_some_join_2", "[strict upper bounds]") {
 }
 
 
+TEST_CASE("interval analysis 1", "[intervals]") {
+
+    std::string source = std::string("int a = 10;") +
+        "\nassert (a == 10);";
+
+    std::vector<Token> tokens = scan_tokens(source);
+    REQUIRE(!tokens.empty());
+
+    Parser p = Parser {.ast = Ast {}, .tokens = tokens, .errors = {}, .pos = 0U};
+    ParsedProgram program = parse_program(p, {});
+    REQUIRE(!program.inner.empty());
+    CFG cfg = get_cfg(program);
+    REQUIRE(!cfg.nodes.empty());
+    auto fixpoint_result = fixpoint_analyze<NonRelational<Interval>>(cfg);
+
+    for (const auto& [node_id, sat] : fixpoint_result.asserts_sat) {
+        REQUIRE(sat == SAT_SAT);
+    }
+}
+
+
