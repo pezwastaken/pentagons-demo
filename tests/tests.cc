@@ -16,3 +16,73 @@ TEST_CASE("interval join", "[intervals]") {
     REQUIRE(res.high == 20);
 }
 
+
+
+/*
+ *
+ * upper bounds
+ *
+ */
+
+std::set<std::string_view> get_ub_for(const std::vector<std::string>& v) {
+    std::set<std::string_view> res {};
+    for (const auto& s : v) {
+        res.insert(s);
+    }
+    return res;
+}
+
+TEST_CASE("ub top", "[strict upper bounds]") {
+    SubDomain::State a = SubDomain::top_state();
+
+    REQUIRE(a.env.empty());
+    REQUIRE(a.reachable);
+}
+
+TEST_CASE("ub top_join", "[strict upper bounds]") {
+    SubDomain::State a = SubDomain::top_state();
+    SubDomain::State b = SubDomain::top_state();
+
+    auto c = SubDomain::join(a, b);
+
+    REQUIRE(c.env.empty());
+    REQUIRE(c.reachable);
+}
+
+TEST_CASE("ub bottom_top_join", "[strict upper bounds]") {
+    SubDomain::State a = SubDomain::bot_state();
+    SubDomain::State b = SubDomain::top_state();
+
+    auto c = SubDomain::join(a, b);
+
+    REQUIRE(c.env.empty());
+    REQUIRE(c.reachable);
+}
+
+TEST_CASE("ub bottom_bottom_join", "[strict upper bounds]") {
+    SubDomain::State a = SubDomain::bot_state();
+    SubDomain::State b = SubDomain::bot_state();
+
+    auto c = SubDomain::join(a, b);
+
+    REQUIRE(c.env.empty());
+    REQUIRE(!c.reachable);
+}
+
+TEST_CASE("ub bottom_some_join", "[strict upper bounds]") {
+    SubDomain::State a = SubDomain::bot_state();
+    SubDomain::State b = SubDomain::top_state();
+
+    SubDomain::Sub s {.ub = get_ub_for({"x", "y"})};
+    b.env.insert(std::make_pair("a", s));
+
+    auto c = SubDomain::join(a, b);
+
+    REQUIRE(!c.env.empty());
+    REQUIRE(c.reachable);
+    REQUIRE(c.env.contains("a"));
+    REQUIRE(b.env["a"].ub == c.env["a"].ub);
+}
+
+
+

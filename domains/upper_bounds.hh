@@ -1,19 +1,15 @@
 #pragma once
 
-#include "parser.hh"
 #include <cmath>
-#include <algorithm>
 #include <set>
 
 struct SubDomain {
 
     struct Sub {
-        AbstractElementKind kind = BOT;
         std::set<std::string_view> ub;
     };
 
     struct State {
-        AbstractElementKind kind = BOT;
         std::map<std::string_view, Sub> env;
         bool reachable = true;
     };
@@ -31,6 +27,7 @@ struct SubDomain {
                 if (other != name) {
                     State res = forget(s, name);
                     res.env[name] = res.env[other];
+
                     // every z that has y in its ub, now also has x
                     for (auto& entry : res.env) {
                         if (entry.second.ub.contains(other)) {
@@ -52,18 +49,18 @@ struct SubDomain {
     }
 
     static State top_state() {
-        return State {.kind = TOP, .env = {}, .reachable = true};
+        return State {.env = {}, .reachable = true};
     }
 
     static State bot_state() {
-        return State {.kind = BOT, .env = {}, .reachable = false};
+        return State {.env = {}, .reachable = false};
     }
 
     static std::string dump_state(const State& s) {
 
-        if (s.kind == BOT)
+        if (s.reachable == false)
             return "[ BOT ]";
-        if (s.kind == TOP)
+        if (s.reachable && s.env.empty())
             return "[ TOP ]";
 
         std::string res = "[\n";
@@ -80,34 +77,50 @@ struct SubDomain {
     }
 
     static bool is_bottom(const State& s) {
-        return s.kind == BOT;
+        return s.reachable == false;
     }
 
     static bool is_top(const State& s) {
-        return s.kind == TOP;
+        return s.reachable && s.env.empty();
     }
 
     static State join(const State& s1, const State& s2) {
 
-        if (s1.kind == TOP || s2.kind == TOP) return top_state();
-        if (s1.kind == BOT) return s2;
-        if (s2.kind == BOT) return s1;
+        if (!s1.reachable) return s2;
+        if (!s2.reachable) return s1;
 
-        State res = s1;
+        State res {.env = {}, .reachable = true};
 
-        for (const auto& [var, s2_var_subs] : s2.env) {
+        for (const auto& [var, s1_var_subs] : s1.env) {
 
-            if (!s1.env.contains(var)) {
-                res.env[var] = s2_var_subs;
+            if (!s2.env.contains(var)) {
+                continue;
             }
             else {
-                const Sub& s1_var_subs = s1.env.at(var);
-                Sub joined = sub_join(s1_var_subs, s2_var_subs);
+                const Sub& s2_var_subs = s2.env.at(var);
+                Sub joined = sub_intersect(s1_var_subs, s2_var_subs);
                 res.env[var] = joined;
             }
         }
-
         return res;
+    }
+
+    static bool leq(const State& s1, const State& s2) {
+
+        if (!s1.reachable) return true;
+        if (!s2.reachable) return false;
+
+        for (const auto& [var, s2_subs] : s2.env) {
+
+            if (!s1.env.contains(var)) {
+                return false;
+            }
+            else {
+                if (!sub_leq(s1.env.at(var), s2_subs))
+                    return false;
+            }
+        }
+        return true;
     }
 
     static bool is_reachable(const State& s) {
@@ -152,6 +165,9 @@ struct SubDomain {
         return s;
     }
 
+    static State widening(const State& prev, const State& current) {
+        return join(prev, current);
+    }
 
 private:
 
@@ -179,7 +195,7 @@ private:
         isize constant_value = bin_right_expr.token.literal.value.int_value;
 
         if (is_same_var && constant_value > 0) {
-            res.env[name] = sub_top();
+            res.env.erase(name);
             return res;
         }
 
@@ -208,14 +224,6 @@ private:
         return forget(s, name);
     }
 
-    static Sub sub_bottom() {
-        return Sub {.kind = BOT, .ub = {}};
-    }
-
-    static Sub sub_top() {
-        return Sub {.kind = TOP, .ub = {}};
-    }
-
     static State forget(const State& s, std::string_view name) {
         State res = s;
         res.env.erase(name);
@@ -225,18 +233,23 @@ private:
         return res;
     }
 
-    static Sub sub_join(const Sub& s1, const Sub& s2) {
+    static Sub sub_intersect(const Sub& s1, const Sub& s2) {
 
-        if (s1.kind == BOT) return s2;
-        if (s2.kind == BOT) return s1;
-        if (s1.kind == TOP || s2.kind == TOP) return s1;
-
-        Sub res {.kind = SOME, .ub = {}};
+        Sub res {.ub = {}};
         for (const auto& var : s1.ub) {
             if (s2.ub.contains(var))
                 res.ub.insert(var);
         }
         return res;
+    }
+
+    static bool sub_leq(const Sub& s1, const Sub& s2) {
+
+        for (auto var : s2.ub) {
+            if (!s1.ub.contains(var))
+                return false;
+        }
+        return true;
     }
 
 };
