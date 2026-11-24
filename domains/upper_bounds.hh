@@ -11,7 +11,7 @@ struct SubDomain {
 
     struct State {
         std::map<std::string_view, Sub> env;
-        bool reachable = true;
+        AbstractElementKind kind = BOT;
     };
 
 
@@ -25,7 +25,8 @@ struct SubDomain {
                 std::string_view other = e.token.lexeme;
                 // if name != e:
                 if (other != name) {
-                    State res = forget(s, name);
+                    State res = {.env = s.env, .kind = SOME};
+                    forget(res, name);
                     res.env[name] = res.env[other];
 
                     // every z that has y in its ub, now also has x
@@ -48,19 +49,23 @@ struct SubDomain {
         }
     }
 
+    static State initial_state() {
+        return State {.env = {}, .kind = SOME};
+    }
+
     static State top_state() {
-        return State {.env = {}, .reachable = true};
+        return State {.env = {}, .kind = TOP};
     }
 
     static State bot_state() {
-        return State {.env = {}, .reachable = false};
+        return State {.env = {}, .kind = BOT};
     }
 
     static std::string dump_state(const State& s) {
 
-        if (s.reachable == false)
+        if (s.kind == BOT)
             return "[ BOT ]";
-        if (s.reachable && s.env.empty())
+        if (s.kind == TOP)
             return "[ TOP ]";
 
         std::string res = "[\n";
@@ -77,19 +82,23 @@ struct SubDomain {
     }
 
     static bool is_bottom(const State& s) {
-        return s.reachable == false;
+        if (s.kind == BOT) assert(s.env.empty());
+        return s.kind == BOT;
     }
 
     static bool is_top(const State& s) {
-        return s.reachable && s.env.empty();
+        if (s.kind == TOP) assert(s.env.empty());
+        return s.kind == TOP;
     }
 
     static State join(const State& s1, const State& s2) {
 
-        if (!s1.reachable) return s2;
-        if (!s2.reachable) return s1;
+        if (s1.kind == BOT) return s2;
+        if (s2.kind == BOT) return s1;
 
-        State res {.env = {}, .reachable = true};
+        if (s1.kind == TOP || s2.kind == TOP) return top_state();
+
+        State res {.env = {}, .kind = SOME};
 
         for (const auto& [var, s1_var_subs] : s1.env) {
 
@@ -110,8 +119,8 @@ struct SubDomain {
 
     static bool leq(const State& s1, const State& s2) {
 
-        if (!s1.reachable) return true;
-        if (!s2.reachable) return false;
+        if (s1.kind == BOT) return true;
+        if (s2.kind == BOT) return false;
 
         for (const auto& [var, s2_subs] : s2.env) {
 
@@ -127,7 +136,7 @@ struct SubDomain {
     }
 
     static bool is_reachable(const State& s) {
-        return s.reachable;
+        return s.kind != BOT;
     }
 
     static State assume(const CFG& cfg, const State& s, const Expr& e) {
@@ -135,14 +144,15 @@ struct SubDomain {
         if (e.kind != BINARY_EXPR)
             return s;
 
-
         if (e.bin_op == OP_BINARY_LT) {
 
             bool are_vars = (cfg[e.left].kind == VARIABLE_EXPR)
                 && (cfg[e.right].kind == VARIABLE_EXPR);
 
-            if (!are_vars)
+            if (!are_vars) {
+                std::cout << "< between exprs that are not both variables" << std::endl;
                 return s;
+            }
 
             // `x < y`
 
@@ -150,6 +160,13 @@ struct SubDomain {
             std::string_view bin_right_var = cfg[e.right].token.lexeme;
 
             State res = s;
+
+            // not tracking x < y, add it to the environment
+            if (!res.env.contains(bin_left_var)) {
+                Sub x_upperbounds {.ub = {bin_right_var}};
+                res.env.insert(std::make_pair(bin_left_var, x_upperbounds));
+            }
+
             for (auto& entry : res.env) {
                 if (entry.second.ub.contains(bin_left_var)) {
                     entry.second.ub.insert(bin_right_var);

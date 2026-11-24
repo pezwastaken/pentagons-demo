@@ -1,5 +1,6 @@
 #pragma once
 
+#include <unistd.h>
 struct Pentagons {
 
     using Intervals = NonRelational<Interval>;
@@ -28,6 +29,12 @@ struct Pentagons {
         return res;
     }
 
+    static State initial_state() {
+        IntervalsState b = Intervals::initial_state();
+        SubsState s = SubDomain::initial_state();
+        return make(b, s);
+    }
+
     static State top_state() {
         IntervalsState b = Intervals::top_state();
         SubsState s = SubDomain::top_state();
@@ -53,7 +60,7 @@ struct Pentagons {
     }
 
     static bool is_top(const State& s) {
-        return s.b.kind == TOP && (s.s.reachable && s.s.env.empty());
+        return s.b.kind == TOP && (s.s.kind == TOP && s.s.env.empty());
     }
 
     static State join(const State& s1, const State& s2) {
@@ -95,7 +102,7 @@ private:
 
             for (const auto& [x, uppers] : in.s.env) {
 
-                if (in.b.env.contains(x)) continue;
+                if (!in.b.env.contains(x)) continue;
 
                 // x < y, refine the intervals of both
                 for (std::string_view y : uppers.ub) {
@@ -105,8 +112,8 @@ private:
                     Interval& r_x = in.b.env[x];
                     Interval& r_y = in.b.env[y];
 
-                    changed |= reduce_high(r_x, saturating_sub(r_y.low, 1));
-                    changed |= reduce_low(r_y, saturating_add(r_x.high, 1));
+                    changed |= reduce_high(r_x, saturating_sub(r_y.high, 1));
+                    changed |= reduce_low(r_y, saturating_add(r_x.low, 1));
 
                     if (r_x.low > r_x.high || r_y.low > r_y.high) {
                         bot_state_in_place(in);
@@ -115,20 +122,19 @@ private:
 
                     assert(r_x.low <= r_y.low);
                     assert(r_x.high <= r_y.high);
-                    assert(r_x.high <= r_y.low);
                 }
             }
         }
     }
 
     inline static bool reduce_high(Interval& i, isize cap) {
-        if (i.high < cap) return false;
+        if (i.high <= cap) return false;
         i.high = cap;
         return true;
     }
 
     inline static bool reduce_low(Interval& i, isize cap) {
-        if (i.low > cap) return false;
+        if (i.low >= cap) return false;
         i.low = cap;
         return true;
     }

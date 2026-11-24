@@ -197,3 +197,24 @@ TEST_CASE("pentagons analysis 1", "[pentagons]") {
     }
 }
 
+TEST_CASE("pentagons analysis 2 relational", "[pentagons]") {
+
+    std::string source = std::string("int a = input(0,100);") +
+        "\nint b = input(0, 100);" +
+        "\nif (a < b) {\n assert(a < b);\n}";
+
+    std::vector<Token> tokens = scan_tokens(source);
+    REQUIRE(!tokens.empty());
+
+    Parser p = Parser {.ast = Ast {}, .tokens = tokens, .errors = {}, .pos = 0U};
+    ParsedProgram program = parse_program(p, {});
+    REQUIRE(!program.inner.empty());
+    CFG cfg = get_cfg(program);
+    REQUIRE(!cfg.nodes.empty());
+    auto fixpoint_result = fixpoint_analyze<Pentagons>(cfg);
+
+    for (const auto& [node_id, sat] : fixpoint_result.asserts_sat) {
+        REQUIRE(sat == SAT_SAT);
+    }
+}
+

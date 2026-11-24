@@ -167,6 +167,9 @@ FixpointResult<D> fixpoint_analyze(const CFG& cfg) {
     std::deque<CfgNodeId> que;
     que.push_back(root);
 
+    S entrypoint_state = D::initial_state();
+    node_states[root] = entrypoint_state;
+
     while (!que.empty()) {
 
         CfgNodeId x = que.front();

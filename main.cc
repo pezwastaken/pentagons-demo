@@ -48,7 +48,7 @@ int main() {
     //     std::cerr << "
     // }
 
-    auto fixpoint_result = fixpoint_analyze<NonRelational<Interval>>(cfg);
+    auto fixpoint_result = fixpoint_analyze<Pentagons>(cfg);
 
     std::cout << "have results for " << fixpoint_result.asserts_sat.size() << " asserts" << std::endl;
 

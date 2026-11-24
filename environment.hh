@@ -57,6 +57,7 @@ template <class D>
 concept StateDomain = requires(const CFG& cfg, D::State s, std::string_view x, const Expr& e) {
 
     { D::assign(cfg, s, x, e) } -> std::same_as<typename D::State>;
+    { D::initial_state() } -> std::same_as<typename D::State>;
     { D::top_state() } -> std::same_as<typename D::State>;
     { D::bot_state() } -> std::same_as<typename D::State>;
     { D::dump_state(s) } -> std::same_as<std::string>;
@@ -84,7 +85,7 @@ struct NonRelational {
         bool reachable = true;
     };
 
-    static V eval(const CFG& cfg, State& s, const Expr& e) {
+    static V eval(const CFG& cfg, const State& s, const Expr& e) {
         switch (e.kind) {
         case LITERAL_EXPR:
             return V::constant(e.token.literal.value.int_value);
@@ -94,8 +95,8 @@ struct NonRelational {
                     std::cerr << "accessing non initialized variable `" << std::string(e.token.lexeme) << "`" << std::endl;
                     return V::bottom();
                 }
-
-                return s.env[std::string(e.token.lexeme)];
+                State res = s;
+                return res.env[e.token.lexeme];
             }
         case UNARY_EXPR:
             return V::unary(e, eval(cfg, s, cfg[e.left]));
@@ -116,13 +117,15 @@ struct NonRelational {
         }
     }
 
-    static State assign(const CFG& cfg, State s, std::string_view name, const Expr& e) {
+    static State assign(const CFG& cfg, const State& s, std::string_view name, const Expr& e) {
         V value = eval(cfg, s, e);
 
+        State res = s;
+
         if (!V::is_bottom(value)) {
-            s.kind = SOME;
-            s.env[name] = value;
-            return s;
+            res.kind = SOME;
+            res.env[name] = value;
+            return res;
         }
         else {
             return bot_state();
@@ -154,13 +157,14 @@ struct NonRelational {
         return out;
     }
 
-    static State set(State s, std::string_view name, V value) {
-        s.kind = SOME;
-        s.env[name] = value;
-        return s;
+    static State set(const State& s, std::string_view name, V value) {
+        State res = s;
+        res.kind = SOME;
+        res.env[name] = value;
+        return res;
     }
 
-    static State assume(const CFG& cfg, State s, const Expr& e) {
+    static State assume(const CFG& cfg, const State& s, const Expr& e) {
 
         if (e.kind != BINARY_EXPR)
             return bot_state();
@@ -168,7 +172,7 @@ struct NonRelational {
         return inner_assume(cfg, s, e);
     }
 
-    static State inner_assume(const CFG& cfg, State s, const Expr& e) {
+    static State inner_assume(const CFG& cfg, const State& s, const Expr& e) {
 
         if (cfg[e.left].kind == VARIABLE_EXPR) {
             V left_value = eval(cfg, s, cfg[e.left]);
@@ -183,6 +187,10 @@ struct NonRelational {
         }
 
         return s;
+    }
+
+    static State initial_state() {
+        return State {.kind = SOME, .env = {}, .reachable = true};
     }
 
     static State top_state() {
