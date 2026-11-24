@@ -11,19 +11,10 @@ typename D::State transfer_declaration(const CFG& cfg, typename D::State& entry_
 
     assert(n.stmt.kind == CFG_DECLARATION);
 
-    std::string declaring_name = std::string(n.stmt.name.lexeme);
+    auto declaring_name = n.stmt.name.lexeme;
     assert(declaring_name != "");
 
     typename D::State out = D::assign(cfg, entry_state, declaring_name, cfg[n.stmt.rhs]);
-
-
-#ifndef NDEBUG
-
-    if (!D::is_bottom(out) && !D::is_top(out)) {
-        assert(!out.env.empty());
-    }
-#endif
-
     return out;
 }
 
@@ -32,12 +23,11 @@ typename D::State transfer_assign(const CFG& cfg, typename D::State& entry_state
 
     assert(n.stmt.kind == CFG_ASSIGNMENT);
 
-    std::string declaring_name = std::string(cfg[n.stmt.lhs].token.lexeme);
+    auto declaring_name = cfg[n.stmt.lhs].token.lexeme;
     assert(declaring_name != "");
 
     typename D::State out = D::assign(cfg, entry_state, declaring_name, cfg[n.stmt.rhs]);
 
-    assert(!out.env.empty());
     return out;
 }
 
@@ -45,11 +35,6 @@ template <StateDomain D>
 typename D::State transfer_assume(const CFG& cfg, typename D::State& entry_state, const Expr& e) {
 
     typename D::State out = D::assume(cfg, entry_state, e);
-#ifndef NDEBUG
-    if (!D::is_bottom(out)) {
-        assert(!out.env.empty());
-    }
-#endif
     return out;
 }
 

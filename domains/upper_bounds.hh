@@ -15,7 +15,7 @@ struct SubDomain {
     };
 
 
-    static State assign(const CFG& cfg, const State& s, const std::string& name, const Expr& e) {
+    static State assign(const CFG& cfg, const State& s, std::string_view name, const Expr& e) {
 
         switch (e.kind) {
             case LITERAL_EXPR:
@@ -174,7 +174,7 @@ struct SubDomain {
 
 private:
 
-    static State inner_assign_with_binary(const CFG& cfg, const State& s, const std::string& name, const Expr& e) {
+    static State inner_assign_with_binary(const CFG& cfg, const State& s, std::string_view name, const Expr& e) {
 
         const Expr& bin_left_expr = cfg[e.left];
         const Expr& bin_right_expr = cfg[e.right];

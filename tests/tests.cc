@@ -145,4 +145,55 @@ TEST_CASE("interval analysis 1", "[intervals]") {
     }
 }
 
+/*
+ *
+ * pentagons
+ *
+ */
+
+TEST_CASE("pentagons join bot bot", "[pentagons]") {
+
+    Pentagons::State s1 = Pentagons::bot_state();
+    Pentagons::State s2 = Pentagons::bot_state();
+
+    Pentagons::State res = Pentagons::join(s1, s2);
+
+    REQUIRE(Pentagons::is_bottom(res));
+    REQUIRE(!Pentagons::is_top(Pentagons::join(s1, s2)));
+    REQUIRE(!Pentagons::is_reachable(s1));
+    REQUIRE(!Pentagons::is_reachable(s1));
+    REQUIRE(!Pentagons::is_reachable(Pentagons::join(s1, s2)));
+}
+
+TEST_CASE("pentagons leq bot top", "[pentagons]") {
+
+    Pentagons::State s1 = Pentagons::bot_state();
+    Pentagons::State s2 = Pentagons::top_state();
+
+    Pentagons::State res = Pentagons::join(s1, s2);
+    REQUIRE(Pentagons::is_top(res));
+    REQUIRE(!Pentagons::is_bottom(res));
+    REQUIRE(Pentagons::leq(s1, s2));
+    REQUIRE(!Pentagons::leq(s2, s1));
+}
+
+TEST_CASE("pentagons analysis 1", "[pentagons]") {
+
+    std::string source = std::string("int a = 10;") +
+        "\nassert (a == 10);";
+
+    std::vector<Token> tokens = scan_tokens(source);
+    REQUIRE(!tokens.empty());
+
+    Parser p = Parser {.ast = Ast {}, .tokens = tokens, .errors = {}, .pos = 0U};
+    ParsedProgram program = parse_program(p, {});
+    REQUIRE(!program.inner.empty());
+    CFG cfg = get_cfg(program);
+    REQUIRE(!cfg.nodes.empty());
+    auto fixpoint_result = fixpoint_analyze<Pentagons>(cfg);
+
+    for (const auto& [node_id, sat] : fixpoint_result.asserts_sat) {
+        REQUIRE(sat == SAT_SAT);
+    }
+}
 

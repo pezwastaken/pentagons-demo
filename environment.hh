@@ -54,7 +54,7 @@ concept ValueDomain = requires (V a, V b, isize n, const Expr& unary, const Expr
 
 
 template <class D>
-concept StateDomain = requires(const CFG& cfg, D::State s, const std::string& x, const Expr& e) {
+concept StateDomain = requires(const CFG& cfg, D::State s, std::string_view x, const Expr& e) {
 
     { D::assign(cfg, s, x, e) } -> std::same_as<typename D::State>;
     { D::top_state() } -> std::same_as<typename D::State>;
@@ -80,7 +80,7 @@ struct NonRelational {
 
     struct State {
         AbstractElementKind kind = BOT;
-        std::map<std::string, V> env;
+        std::map<std::string_view, V> env;
         bool reachable = true;
     };
 
@@ -90,7 +90,7 @@ struct NonRelational {
             return V::constant(e.token.literal.value.int_value);
         case VARIABLE_EXPR:
             {
-                if (s.env.find(std::string(e.token.lexeme)) == s.env.end()) {
+                if (s.env.find(e.token.lexeme) == s.env.end()) {
                     std::cerr << "accessing non initialized variable `" << std::string(e.token.lexeme) << "`" << std::endl;
                     return V::bottom();
                 }
@@ -116,7 +116,7 @@ struct NonRelational {
         }
     }
 
-    static State assign(const CFG& cfg, State s, const std::string& name, const Expr& e) {
+    static State assign(const CFG& cfg, State s, std::string_view name, const Expr& e) {
         V value = eval(cfg, s, e);
 
         if (!V::is_bottom(value)) {
@@ -154,7 +154,7 @@ struct NonRelational {
         return out;
     }
 
-    static State set(State s, const std::string& name, V value) {
+    static State set(State s, std::string_view name, V value) {
         s.kind = SOME;
         s.env[name] = value;
         return s;
@@ -179,7 +179,7 @@ struct NonRelational {
                 return bot_state();
             }
 
-            return set(s, std::string(cfg[e.left].token.lexeme), filtered);
+            return set(s, cfg[e.left].token.lexeme, filtered);
         }
 
         return s;
@@ -202,7 +202,7 @@ struct NonRelational {
 
         std::string res = "[\n";
         for (const auto& x : s.env) {
-            res += "\t" + x.first + " = " + V::dump_value(x.second) + "\n";
+            res += "\t" + std::string(x.first) + " = " + V::dump_value(x.second) + "\n";
         }
         res += "]\n";
         return res;

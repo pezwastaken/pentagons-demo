@@ -1,5 +1,6 @@
 #pragma once
 
+#include <climits>
 #include <string>
 #include <fstream>
 #include <sstream>
@@ -21,4 +22,23 @@ inline std::string read_file(std::string name) {
     return buffer.str();
 }
 
+[[gnu::pure]]
+inline isize saturating_add(isize x, isize y) {
+    isize res;
+    if (!__builtin_add_overflow(x, y, &res))
+        return res;
+
+    if (y > 0) return LONG_LONG_MAX;
+    return LONG_LONG_MIN;
+}
+
+[[gnu::pure]]
+inline isize saturating_sub(isize x, isize y) {
+    isize res;
+    if (!__builtin_sub_overflow(x, y, &res))
+        return res;
+
+    if (y > 0) return LONG_LONG_MIN;
+    return LONG_LONG_MAX;
+}
 
