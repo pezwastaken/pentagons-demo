@@ -46,22 +46,10 @@ struct TransferInfo {
 template <StateDomain D>
 typename D::State transfer_assert(const CFG& cfg, typename D::State& entry_state, const Expr& e, TransferInfo& assert_info) {
 
-    auto ok = transfer_assume<D>(cfg, entry_state, e);
+    Satisfiability sat = D::satisfies(cfg,  entry_state, e);
+    assert_info.is_assert_sat = sat;
 
-    const Expr negated = expr_negate(e);
-    auto bad = transfer_assume<D>(cfg, entry_state, negated);
-
-    if (D::is_bottom(bad)) {
-        assert_info.is_assert_sat = SAT_SAT;
-    }
-    else if (D::is_bottom(ok)){
-        assert_info.is_assert_sat = SAT_UNSAT;
-    }
-    else {
-        assert_info.is_assert_sat = SAT_UNKNOWN;
-    }
-
-    return ok;
+    return transfer_assume<D>(cfg, entry_state, e);
 }
 
 template <StateDomain D>

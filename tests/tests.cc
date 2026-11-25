@@ -36,7 +36,7 @@ TEST_CASE("ub top", "[strict upper bounds]") {
     SubDomain::State a = SubDomain::top_state();
 
     REQUIRE(a.env.empty());
-    REQUIRE(a.reachable);
+    REQUIRE(a.kind == TOP);
 }
 
 TEST_CASE("ub top_join", "[strict upper bounds]") {
@@ -46,7 +46,7 @@ TEST_CASE("ub top_join", "[strict upper bounds]") {
     auto c = SubDomain::join(a, b);
 
     REQUIRE(c.env.empty());
-    REQUIRE(c.reachable);
+    REQUIRE(c.kind == TOP);
 }
 
 TEST_CASE("ub bottom_top_join", "[strict upper bounds]") {
@@ -56,7 +56,7 @@ TEST_CASE("ub bottom_top_join", "[strict upper bounds]") {
     auto c = SubDomain::join(a, b);
 
     REQUIRE(c.env.empty());
-    REQUIRE(c.reachable);
+    REQUIRE(c.kind == TOP);
 }
 
 TEST_CASE("ub bottom_bottom_join", "[strict upper bounds]") {
@@ -66,7 +66,7 @@ TEST_CASE("ub bottom_bottom_join", "[strict upper bounds]") {
     auto c = SubDomain::join(a, b);
 
     REQUIRE(c.env.empty());
-    REQUIRE(!c.reachable);
+    REQUIRE(c.kind == BOT);
 }
 
 TEST_CASE("ub bottom_some_join", "[strict upper bounds]") {
@@ -75,11 +75,12 @@ TEST_CASE("ub bottom_some_join", "[strict upper bounds]") {
 
     SubDomain::Sub s {.ub = get_ub_for({"x", "y"})};
     b.env.insert(std::make_pair("a", s));
+    b.kind = SOME;
 
     auto c = SubDomain::join(a, b);
 
     REQUIRE(!c.env.empty());
-    REQUIRE(c.reachable);
+    REQUIRE(c.kind == SOME);
     REQUIRE(c.env.contains("a"));
     REQUIRE(b.env["a"].ub == c.env["a"].ub);
 }
@@ -88,6 +89,8 @@ TEST_CASE("ub bottom_some_join", "[strict upper bounds]") {
 TEST_CASE("ub_some_some_join", "[strict upper bounds]") {
     SubDomain::State a = SubDomain::top_state();
     SubDomain::State b = SubDomain::top_state();
+    a.kind = SOME;
+    b.kind = SOME;
 
     SubDomain::Sub s1 {.ub = get_ub_for({"x", "y"})};
     a.env.insert(std::make_pair("a", s1));
@@ -98,7 +101,7 @@ TEST_CASE("ub_some_some_join", "[strict upper bounds]") {
     auto c = SubDomain::join(a, b);
 
     REQUIRE(!c.env.empty());
-    REQUIRE(c.reachable);
+    REQUIRE(c.kind == SOME);
     REQUIRE(c.env.contains("a"));
     REQUIRE(a.env["a"].ub == c.env["a"].ub);
 }
@@ -106,6 +109,8 @@ TEST_CASE("ub_some_some_join", "[strict upper bounds]") {
 TEST_CASE("ub_some_some_join_2", "[strict upper bounds]") {
     SubDomain::State a = SubDomain::top_state();
     SubDomain::State b = SubDomain::top_state();
+    a.kind = SOME;
+    b.kind = SOME;
 
     SubDomain::Sub s1_1{.ub = get_ub_for({"x", "y"})};
     SubDomain::Sub s1_2 {.ub = get_ub_for({"z"})};
@@ -118,7 +123,7 @@ TEST_CASE("ub_some_some_join_2", "[strict upper bounds]") {
     auto c = SubDomain::join(a, b);
 
     REQUIRE(!c.env.empty());
-    REQUIRE(c.reachable);
+    REQUIRE(c.kind == SOME);
     REQUIRE(c.env.contains("a"));
     REQUIRE(a.env["a"].ub == c.env["a"].ub);
     REQUIRE(!c.env.contains("b"));

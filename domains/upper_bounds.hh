@@ -185,6 +185,58 @@ struct SubDomain {
         return s;
     }
 
+    static Satisfiability satisfies(const CFG& cfg, const State& s, const Expr& e) {
+        if (e.kind != BINARY_EXPR) {
+            return SAT_UNKNOWN;
+        }
+
+        if (!(cfg[e.left].kind == VARIABLE_EXPR)
+                || !(cfg[e.right].kind == VARIABLE_EXPR)) {
+            return SAT_UNKNOWN;
+        }
+
+        auto x = cfg[e.left].token.lexeme;
+        auto y = cfg[e.right].token.lexeme;
+
+        switch (e.bin_op) {
+
+        case OP_BINARY_LT: {
+            return sub_satisfies_lt(s, x, y);
+        }
+        case OP_BINARY_GT: {
+            return sat_negate(sub_satisfies_lt(s, x, y));
+        }
+        case OP_BINARY_EQ: {
+            if (s.env.contains(x)) {
+                if (s.env.at(x).ub.contains(y))
+                    return SAT_UNSAT;
+            }
+            if (s.env.contains(y)) {
+                if (s.env.at(y).ub.contains(x))
+                    return SAT_UNSAT;
+            }
+            return SAT_UNKNOWN;
+        }
+        case OP_BINARY_NE: {
+            if (s.env.contains(x)) {
+                if (s.env.at(x).ub.contains(y))
+                    return SAT_SAT;
+            }
+            if (s.env.contains(y)) {
+                if (s.env.at(y).ub.contains(x))
+                    return SAT_SAT;
+            }
+            return SAT_UNKNOWN;
+        }
+        case OP_BINARY_GE:
+            return SAT_UNKNOWN;
+        case OP_BINARY_LE:
+            return SAT_UNKNOWN;
+        default:
+            return SAT_UNKNOWN;
+        }
+    }
+
     static State widening(const State& prev, const State& current) {
         return join(prev, current);
     }
@@ -270,6 +322,25 @@ private:
                 return false;
         }
         return true;
+    }
+
+    static Satisfiability sub_satisfies_lt(const State& s, std::string_view x,
+            std::string_view y) {
+
+        if (s.env.contains(x)) {
+            const auto& x_upper_bounds = s.env.at(x);
+            if (x_upper_bounds.ub.contains(y)) {
+                return SAT_SAT;
+            }
+            else {
+                // didn't find x < y, but there could be y < x
+                const auto& y_upper_bounds = s.env.at(y);
+                if (y_upper_bounds.ub.contains(x))
+                    return SAT_UNSAT;
+                return SAT_UNKNOWN;
+            }
+        }
+        return SAT_UNKNOWN;
     }
 
 };

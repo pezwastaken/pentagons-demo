@@ -72,6 +72,7 @@ concept StateDomain = requires(const CFG& cfg, D::State s, std::string_view x, c
     // TODO: this should return a tuple <abstract value, abstract state> (function calls with side effects)
 
     { D::assume(cfg, s, e) } -> std::same_as<typename D::State>;
+    { D::satisfies(cfg, s, e) } -> std::same_as<Satisfiability>;
     { D::widening(s, s) } -> std::same_as<typename D::State>;
 
 };
@@ -170,6 +171,12 @@ struct NonRelational {
             return bot_state();
 
         return inner_assume(cfg, s, e);
+    }
+
+    static Satisfiability satisfies(const CFG& cfg, const State& s, const Expr& e) {
+            V left_value = eval(cfg, s, cfg[e.left]);
+            V right_value = eval(cfg, s, cfg[e.right]);
+            return V::satisfies(e,  left_value, right_value);
     }
 
     static State inner_assume(const CFG& cfg, const State& s, const Expr& e) {

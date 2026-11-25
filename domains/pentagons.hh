@@ -29,6 +29,18 @@ struct Pentagons {
         return res;
     }
 
+    static Satisfiability satisfies(const CFG& cfg, const State& s, const Expr& e) {
+            // V left_value = eval(cfg, s, cfg[e.left]);
+            // V right_value = eval(cfg, s, cfg[e.right]);
+            // return V::satisfies(e,  left_value, right_value);
+        Satisfiability intervals_sat = Intervals::satisfies(cfg, s.b, e);
+        if (intervals_sat == SAT_UNKNOWN) {
+            return SubDomain::satisfies(cfg, s.s, e);
+        }
+        return intervals_sat;
+
+    }
+
     static State initial_state() {
         IntervalsState b = Intervals::initial_state();
         SubsState s = SubDomain::initial_state();
